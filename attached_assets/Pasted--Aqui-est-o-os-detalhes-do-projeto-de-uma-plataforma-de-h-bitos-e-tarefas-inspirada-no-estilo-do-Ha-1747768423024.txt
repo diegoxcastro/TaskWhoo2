@@ -1,0 +1,47 @@
+
+Aqui estão os detalhes do projeto de uma plataforma de hábitos e tarefas inspirada no estilo do Habitica, com suporte a uma API para gerenciar funcionalidades como tarefas diárias, permanentes e personalizadas. A descrição abrange a estrutura, funcionalidades e endpoints da API, sem incluir o código, conforme solicitado.
+
+Visão Geral do Projeto
+A plataforma, chamada "TaskVida", é um sistema gamificado que ajuda os usuários a criar, gerenciar e acompanhar hábitos e tarefas. Ela combina elementos de produtividade com mecânicas de gamificação, como pontos de experiência (XP), níveis e recompensas virtuais. Os usuários podem configurar tarefas diárias permanentes (como "beber 2L de água") e tarefas personalizadas (como "terminar relatório"), com a possibilidade de marcá-las como concluídas. A API permite integração com outros aplicativos ou dispositivos, oferecendo acesso às funcionalidades principais.
+
+Funcionalidades Principais
+Tarefas Permanentes (Diárias):
+Tarefas recorrentes predefinidas pelo sistema ou pelo usuário, como "meditar 10 minutos" ou "fazer 30 minutos de exercício".
+Resetadas automaticamente ao final do dia.
+Oferecem recompensas (XP, moedas virtuais) ao serem concluídas.
+Penalidades (perda de "vida" ou pontos) se não forem concluídas.
+Tarefas Personalizadas:
+Tarefas únicas ou com prazo definido, criadas pelo usuário, como "comprar mantimentos" ou "estudar para prova".
+Podem ser marcadas como concluídas manualmente.
+Podem ter prioridades (baixa, média, alta) que afetam as recompensas.
+Gamificação:
+Sistema de Progresso: Usuários ganham XP ao completar tarefas, subindo de nível.
+Moedas Virtuais: Ganhas ao completar tarefas, usadas para desbloquear recompensas (ex.: itens cosméticos ou bônus no jogo).
+Vida: Perda de pontos de vida se tarefas permanentes não forem concluídas, com possibilidade de "game over" temporário (bloqueio de algumas funcionalidades até o próximo dia).
+Avatares: Personalização de personagens com itens comprados com moedas.
+Notificações e Lembretes:
+Alertas para tarefas diárias próximas ao fim do dia.
+Lembretes para tarefas personalizadas com prazo.
+Relatórios e Estatísticas:
+Visão geral do progresso diário, semanal e mensal.
+Percentual de conclusão de tarefas permanentes e personalizadas.
+Gráficos de produtividade e streaks (sequências de dias completando todas as tarefas).
+Integração via API:
+Permite que outros aplicativos ou serviços acessem e gerenciem as tarefas do usuário.
+Suporte para autenticação segura (ex.: OAuth 2.0).
+Endpoints para visualizar, criar, editar e marcar tarefas como concluídas.
+Estrutura do Sistema
+Usuários:
+Cada usuário tem um perfil com nome, avatar, nível, XP, pontos de vida e moedas.
+Configurações para personalizar notificações e preferências de gamificação.
+Tarefas:
+Permanentes (Diárias): Armazenadas com título, descrição, recompensa (XP e moedas), penalidade e status de conclusão diária.
+Personalizadas: Incluem título, descrição, prazo (opcional), prioridade e status (pendente, concluída, atrasada).
+Banco de Dados:
+Tabelas principais:
+Users: ID, nome, email, nível, XP, moedas, vida, avatar.
+DailyTasks: ID, user_id, título, descrição, recompensa, penalidade, status (concluída ou não).
+CustomTasks: ID, user_id, título, descrição, prazo, prioridade, status.
+ProgressLog: Registro de atividades para estatísticas (data, tarefa, ação).
+Gamificação:
+Regras: 10 XP por tarefa concluída, +5 XP para tarefas de alta prioridade; 5 moedas por tarefa diária, 10 por tarefa personalizada concluída no prazo; -10 pontos de vida por tarefa diária não concluída.
