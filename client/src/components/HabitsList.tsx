@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Habit } from "@shared/schema";
 import { useTasks } from "@/contexts/TasksContext";
 import { cn } from "@/lib/utils";
-import { PlusCircle, Plus, Minus } from "lucide-react";
+import { PlusCircle, Plus, Minus, Trash2 } from "lucide-react";
 
 interface HabitsListProps {
   habits: Habit[];
@@ -11,7 +11,7 @@ interface HabitsListProps {
 }
 
 export default function HabitsList({ habits, isLoading }: HabitsListProps) {
-  const { openAddTaskModal, scoreHabit } = useTasks();
+  const { openAddTaskModal, scoreHabit, deleteHabit } = useTasks();
 
   // Get priority class based on habit priority
   const getPriorityClass = (priority: string) => {
@@ -90,13 +90,34 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                     <Plus className="h-4 w-4" />
                   </Button>
                 )}
-                <div>
-                  <span className="font-medium">{habit.title}</span>
+                <div className="flex-grow">
+                  <div className="flex justify-between">
+                    <span className="font-medium">{habit.title}</span>
+                    <button 
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Tem certeza que deseja excluir este hábito?')) {
+                          deleteHabit(habit.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                   <div className="flex text-xs text-gray-500 mt-1">
-                    <span className="flex items-center mr-2">
-                      <Plus className="h-3 w-3 mr-1" />
-                      +1.0
-                    </span>
+                    {habit.counterUp > 0 && (
+                      <span className="flex items-center mr-2 text-green-600">
+                        <Plus className="h-3 w-3 mr-1" />
+                        +{habit.counterUp}
+                      </span>
+                    )}
+                    {habit.counterDown > 0 && (
+                      <span className="flex items-center mr-2 text-red-600">
+                        <Minus className="h-3 w-3 mr-1" />
+                        -{habit.counterDown}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
