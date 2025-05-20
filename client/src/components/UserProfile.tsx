@@ -39,31 +39,12 @@ export default function UserProfile() {
               Nível {user.level} Aventureiro
             </p>
             
-            {/* Health Bar */}
+            {/* Just XP info */}
             <div className="mt-2">
-              <div className="flex justify-between text-xs mb-1">
-                <span>Vida</span>
-                <span>{user.health}/{user.maxHealth}</span>
-              </div>
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-700">
-                <div 
-                  className="h-full w-full bg-red-500 transition-all"
-                  style={{ transform: `translateX(-${100 - healthPercentage}%)` }}
-                />
-              </div>
-            </div>
-            
-            {/* Experience Bar */}
-            <div className="mt-2">
-              <div className="flex justify-between text-xs mb-1">
-                <span>Experiência</span>
-                <span>{user.experience}/{xpToNextLevel}</span>
-              </div>
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-700">
-                <div 
-                  className="h-full w-full bg-amber-400 transition-all"
-                  style={{ transform: `translateX(-${100 - xpPercentage}%)` }}
-                />
+              <div className="text-center">
+                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+                  {user.experience} XP
+                </span>
               </div>
             </div>
           </div>

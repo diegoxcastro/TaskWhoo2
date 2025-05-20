@@ -1,15 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Helmet } from "react-helmet";
 import Header from "@/components/Header";
 import UserProfile from "@/components/UserProfile";
 import TasksSection from "@/components/TasksSection";
+import StatsSection from "@/components/StatsSection";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [isHome] = useRoute("/");
+  const [activeTab, setActiveTab] = useState("tasks");
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -42,7 +45,23 @@ export default function Dashboard() {
       
       <Header />
       <UserProfile />
-      <TasksSection />
+      
+      <div className="container mx-auto px-4 py-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
+            <TabsTrigger value="stats">Estatísticas</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="tasks">
+            <TasksSection />
+          </TabsContent>
+          
+          <TabsContent value="stats">
+            <StatsSection />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
