@@ -105,9 +105,9 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                   {todo.notes && (
                     <p className="text-xs text-gray-500 mt-1">{todo.notes}</p>
                   )}
-                  {todo.dueDate && typeof todo.dueDate === 'string' && (
+                  {todo.dueDate && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Prazo: {format(new Date(todo.dueDate), 'dd/MM/yyyy')}
+                      Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
                     </p>
                   )}
                 </div>

@@ -45,9 +45,12 @@ export default function UserProfile() {
                 <span>Vida</span>
                 <span>{user.health}/{user.maxHealth}</span>
               </div>
-              <Progress value={healthPercentage} className="h-2 bg-gray-700">
-                <div className="h-full w-full bg-red-500" style={{ transform: `translateX(-${100 - healthPercentage}%)` }} />
-              </Progress>
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-700">
+                <div 
+                  className="h-full w-full bg-red-500 transition-all"
+                  style={{ transform: `translateX(-${100 - healthPercentage}%)` }}
+                />
+              </div>
             </div>
             
             {/* Experience Bar */}
@@ -56,9 +59,12 @@ export default function UserProfile() {
                 <span>Experiência</span>
                 <span>{user.experience}/{xpToNextLevel}</span>
               </div>
-              <Progress value={xpPercentage} className="h-2 bg-gray-700">
-                <div className="h-full w-full bg-amber-400" style={{ transform: `translateX(-${100 - xpPercentage}%)` }} />
-              </Progress>
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-700">
+                <div 
+                  className="h-full w-full bg-amber-400 transition-all"
+                  style={{ transform: `translateX(-${100 - xpPercentage}%)` }}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -80,7 +80,7 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           title,
           notes: notes || undefined,
           priority,
-          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined
+          dueDate: dueDate ? new Date(dueDate) : undefined
         };
         await createTodo(todo);
       }

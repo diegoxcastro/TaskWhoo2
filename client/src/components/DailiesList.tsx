@@ -1,3 +1,4 @@
+import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -125,9 +126,16 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                 />
                 <div className="flex-grow">
                   <div className="flex justify-between">
-                    <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
-                      {daily.title}
-                    </span>
+                    <div className="flex items-center">
+                      {daily.icon && (
+                        <div className="mr-2 text-primary">
+                          {React.createElement(getIconComponent(daily.icon), { size: 16 })}
+                        </div>
+                      )}
+                      <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
+                        {daily.title}
+                      </span>
+                    </div>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
                       +{daily.priority === 'trivial' ? '1' : daily.priority === 'easy' ? '2' : daily.priority === 'medium' ? '5' : '10'}
                     </span>
