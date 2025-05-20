@@ -51,12 +51,28 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
           </h2>
           <div>
             {/* Tab navigation for todos categories */}
-            <div className="text-xs text-gray-500 space-x-2">
-              <a href="#" className="underline text-primary font-medium">Todos</a>
-              <a href="#" className="hover:underline">Ativos</a>
-              <a href="#" className="hover:underline">Com Data</a>
-              <a href="#" className="hover:underline">Feitos</a>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-transparent h-6 p-0">
+                <TabsTrigger 
+                  value="all" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="active" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Pendentes
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="completed" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Concluídos
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
       </div>
@@ -82,12 +98,16 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
               </div>
             </div>
           ))
-        ) : incompleteTodos.length === 0 ? (
+        ) : filteredTodos.length === 0 ? (
           <div className="text-center p-4 text-gray-500">
-            Nenhuma tarefa pendente. Adicione sua primeira tarefa!
+            {activeTab === "all" 
+              ? "Nenhuma tarefa encontrada. Adicione sua primeira tarefa!"
+              : activeTab === "active" 
+                ? "Nenhuma tarefa pendente. Bom trabalho!"
+                : "Nenhuma tarefa concluída ainda."}
           </div>
         ) : (
-          incompleteTodos.map((todo) => (
+          filteredTodos.map((todo) => (
             <div 
               key={todo.id} 
               className={cn(
@@ -107,13 +127,36 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                   className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
                 />
                 <div className="flex-grow">
-                  <span className="font-medium">{todo.title}</span>
+                  <div className="flex justify-between">
+                    <span className={cn("font-medium", todo.completed && "line-through text-gray-500")}>{todo.title}</span>
+                    <div className="flex items-center">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">
+                        +{todo.priority === 'trivial' ? '1' : todo.priority === 'easy' ? '2' : todo.priority === 'medium' ? '5' : '10'}
+                      </span>
+                      <button 
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Tem certeza que deseja excluir esta tarefa?')) {
+                            deleteTodo(todo.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                   {todo.notes && (
                     <p className="text-xs text-gray-500 mt-1">{todo.notes}</p>
                   )}
                   {todo.dueDate && (
                     <p className="text-xs text-gray-500 mt-1">
                       Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
+                    </p>
+                  )}
+                  {todo.completed && todo.completedAt && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Completado em: {format(new Date(todo.completedAt), 'dd/MM/yyyy')}
                     </p>
                   )}
                 </div>
@@ -123,41 +166,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
         )}
       </div>
       
-      {/* Completed Todos Message */}
-      {completedTodos.length > 0 && (
-        <div className="mt-6">
-          <h3 className="font-medium text-sm text-gray-700 mb-2">Completados ({completedTodos.length})</h3>
-          <div className="space-y-2">
-            {completedTodos.map((todo) => (
-              <div 
-                key={todo.id} 
-                className="bg-gray-50 border border-gray-200 rounded-md p-2 transition-all"
-              >
-                <div className="flex items-start">
-                  <Checkbox
-                    id={`todo-completed-${todo.id}`}
-                    checked={todo.completed}
-                    onCheckedChange={(checked) => {
-                      if (typeof checked === 'boolean') {
-                        checkTodo(todo.id, checked);
-                      }
-                    }}
-                    className="mt-1 mr-3 h-4 w-4 rounded border-2 border-gray-300"
-                  />
-                  <div className="flex-grow">
-                    <span className="text-sm text-gray-500 line-through">{todo.title}</span>
-                    {todo.completedAt && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Completado em: {format(new Date(todo.completedAt), 'dd/MM/yyyy')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Removido a seção separada para tarefas concluídas, pois estamos usando abas */}
       
       {/* Empty state if no todos at all */}
       {todos.length === 0 && !isLoading && (
