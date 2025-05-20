@@ -14,7 +14,7 @@ export default function UserProfile() {
 
   return (
     <div className="bg-primary-dark text-white">
-      <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between">
+      <div className="container mx-auto px-4 py-4">
         <div className="flex items-center">
           <div className="mr-4">
             <img
@@ -23,7 +23,7 @@ export default function UserProfile() {
               className="h-16 w-16 rounded-full border-2 border-white"
             />
           </div>
-          <div>
+          <div className="flex-grow">
             <div className="flex items-center">
               <h2 className="font-heading font-semibold text-lg">{user.username}</h2>
               <svg
@@ -45,7 +45,9 @@ export default function UserProfile() {
                 <span>Vida</span>
                 <span>{user.health}/{user.maxHealth}</span>
               </div>
-              <Progress value={healthPercentage} className="h-2 bg-gray-700" indicatorClassName="bg-red-500" />
+              <Progress value={healthPercentage} className="h-2 bg-gray-700">
+                <div className="h-full w-full bg-red-500" style={{ transform: `translateX(-${100 - healthPercentage}%)` }} />
+              </Progress>
             </div>
             
             {/* Experience Bar */}
@@ -54,21 +56,10 @@ export default function UserProfile() {
                 <span>Experiência</span>
                 <span>{user.experience}/{xpToNextLevel}</span>
               </div>
-              <Progress value={xpPercentage} className="h-2 bg-gray-700" indicatorClassName="bg-amber-400" />
+              <Progress value={xpPercentage} className="h-2 bg-gray-700">
+                <div className="h-full w-full bg-amber-400" style={{ transform: `translateX(-${100 - xpPercentage}%)` }} />
+              </Progress>
             </div>
-          </div>
-        </div>
-        
-        <div className="mt-4 md:mt-0 md:text-right">
-          <div className="bg-primary bg-opacity-30 rounded-lg p-4">
-            <h3 className="font-heading font-medium">Enfrente monstros com seus amigos</h3>
-            <p className="text-sm text-gray-300 mt-1">
-              Crie um grupo, chame os amigos e erre menos para participar de 
-              missões e aumentar seu inventário
-            </p>
-            <Button className="mt-2 bg-primary hover:bg-purple-600 text-white">
-              Começar já
-            </Button>
           </div>
         </div>
       </div>

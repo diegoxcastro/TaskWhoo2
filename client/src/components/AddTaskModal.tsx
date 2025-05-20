@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useTasks } from "@/contexts/TasksContext";
 import { InsertHabit, InsertDaily, InsertTodo } from "@shared/schema";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CheckCircle, Clock, Activity, Dumbbell, Sun, Moon, Coffee, Book, Music, Heart, Globe, Star } from "lucide-react";
 
 interface AddTaskModalProps {
   type: 'habit' | 'daily' | 'todo';

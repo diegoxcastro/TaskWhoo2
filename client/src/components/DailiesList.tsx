@@ -59,14 +59,7 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
       </button>
       
       {/* Daily Tasks Notification */}
-      {incompleteDailiesCount > 0 && (
-        <div className="mb-4 p-3 bg-amber-100 border-l-4 border-amber-400 rounded-r-md">
-          <div className="flex items-start">
-            <Bell className="text-amber-600 mr-2 h-5 w-5" />
-            <span className="text-sm">{incompleteDailiesCount} notificações</span>
-          </div>
-        </div>
-      )}
+      {/* Notification box removed as requested */}
       
       {/* Daily Tasks List */}
       <div className="space-y-3">
