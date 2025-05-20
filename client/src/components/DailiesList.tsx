@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useTasks } from "@/contexts/TasksContext";
 import { Daily } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   PlusCircle, CheckCircle, Clock, Activity, Dumbbell, Sun, 
   Moon, Coffee, Book, Music, Heart, Globe, Star 
@@ -17,7 +19,8 @@ interface DailiesListProps {
 }
 
 export default function DailiesList({ dailies, isLoading, incompleteDailiesCount }: DailiesListProps) {
-  const { openAddTaskModal, checkDaily } = useTasks();
+  const { openAddTaskModal, checkDaily, deleteDaily } = useTasks();
+  const [activeTab, setActiveTab] = useState("all");
 
   // Get priority class based on daily priority
   const getPriorityClass = (priority: string) => {
@@ -136,9 +139,22 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                         {daily.title}
                       </span>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                      +{daily.priority === 'trivial' ? '1' : daily.priority === 'easy' ? '2' : daily.priority === 'medium' ? '5' : '10'}
-                    </span>
+                    <div className="flex items-center">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">
+                        +{daily.priority === 'trivial' ? '1' : daily.priority === 'easy' ? '2' : daily.priority === 'medium' ? '5' : '10'}
+                      </span>
+                      <button 
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Tem certeza que deseja excluir esta tarefa diária?')) {
+                            deleteDaily(daily.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   {daily.notes && (
                     <p className="text-xs text-gray-500 mt-1">{daily.notes}</p>
