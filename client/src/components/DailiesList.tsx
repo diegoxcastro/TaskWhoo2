@@ -52,6 +52,14 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
     }
   };
 
+  // Filtra as tarefas diárias com base na aba ativa
+  const filteredDailies = dailies.filter(daily => {
+    if (activeTab === "all") return true;
+    if (activeTab === "active") return !daily.completed;
+    if (activeTab === "completed") return daily.completed;
+    return true;
+  });
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
       <div className="mb-4 border-b pb-2">
@@ -66,11 +74,28 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
           </h2>
           <div>
             {/* Tab navigation for dailies categories */}
-            <div className="text-xs text-gray-500 space-x-2">
-              <a href="#" className="underline text-primary font-medium">Todos</a>
-              <a href="#" className="hover:underline">Ativos</a>
-              <a href="#" className="hover:underline">Inativos</a>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-transparent h-6 p-0">
+                <TabsTrigger 
+                  value="all" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="active" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Pendentes
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="completed" 
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                >
+                  Concluídos
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
       </div>
@@ -102,12 +127,16 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
               </div>
             </div>
           ))
-        ) : dailies.length === 0 ? (
+        ) : filteredDailies.length === 0 ? (
           <div className="text-center p-4 text-gray-500">
-            Nenhuma tarefa diária encontrada. Adicione sua primeira tarefa diária!
+            {activeTab === "all" 
+              ? "Nenhuma tarefa diária encontrada. Adicione sua primeira tarefa diária!"
+              : activeTab === "active" 
+                ? "Nenhuma tarefa pendente. Bom trabalho!"
+                : "Nenhuma tarefa concluída ainda."}
           </div>
         ) : (
-          dailies.map((daily) => (
+          filteredDailies.map((daily) => (
             <div 
               key={daily.id} 
               className={cn(

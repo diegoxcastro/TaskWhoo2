@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TasksContext";
 import { Todo } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { PlusCircle, CheckCircle } from "lucide-react";
+import { PlusCircle, CheckCircle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TodosListProps {
   todos: Todo[];
@@ -13,7 +15,8 @@ interface TodosListProps {
 }
 
 export default function TodosList({ todos, isLoading, incompleteTodosCount }: TodosListProps) {
-  const { openAddTaskModal, checkTodo } = useTasks();
+  const { openAddTaskModal, checkTodo, deleteTodo } = useTasks();
+  const [activeTab, setActiveTab] = useState("all");
 
   // Get priority class based on todo priority
   const getPriorityClass = (priority: string) => {
@@ -26,10 +29,13 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
     }
   };
 
-  // Filter incomplete todos
-  const incompleteTodos = todos.filter(todo => !todo.completed);
-  // Filter completed todos
-  const completedTodos = todos.filter(todo => todo.completed);
+  // Filtra as tarefas com base na aba ativa
+  const filteredTodos = todos.filter(todo => {
+    if (activeTab === "all") return true;
+    if (activeTab === "active") return !todo.completed;
+    if (activeTab === "completed") return todo.completed;
+    return true;
+  });
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
