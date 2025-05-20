@@ -11,6 +11,21 @@ import { InsertHabit, InsertDaily, InsertTodo } from "@shared/schema";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CheckCircle, Clock, Activity, Dumbbell, Sun, Moon, Coffee, Book, Music, Heart, Globe, Star } from "lucide-react";
 
+const TASK_ICONS = [
+  { name: "CheckCircle", component: CheckCircle },
+  { name: "Clock", component: Clock },
+  { name: "Activity", component: Activity },
+  { name: "Dumbbell", component: Dumbbell },
+  { name: "Sun", component: Sun },
+  { name: "Moon", component: Moon },
+  { name: "Coffee", component: Coffee },
+  { name: "Book", component: Book },
+  { name: "Music", component: Music },
+  { name: "Heart", component: Heart },
+  { name: "Globe", component: Globe },
+  { name: "Star", component: Star }
+];
+
 interface AddTaskModalProps {
   type: 'habit' | 'daily' | 'todo';
   onClose: () => void;
@@ -30,6 +45,7 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
   
   // Daily-specific fields
   const [repeat, setRepeat] = useState<boolean[]>([true, true, true, true, true, true, true]);
+  const [selectedIcon, setSelectedIcon] = useState("CheckCircle");
   
   // Todo-specific fields
   const [dueDate, setDueDate] = useState("");
@@ -55,7 +71,8 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           title,
           notes: notes || undefined,
           priority,
-          repeat
+          repeat,
+          icon: selectedIcon
         };
         await createDaily(daily);
       } else if (type === 'todo') {
@@ -180,22 +197,46 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           
           {/* Daily-specific options */}
           {type === 'daily' && (
-            <div className="grid gap-2">
-              <Label>Repetir nos dias</Label>
-              <div className="flex flex-wrap gap-1">
-                {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, index) => (
-                  <Button
-                    key={index}
-                    type="button"
-                    variant={repeat[index] ? "default" : "outline"}
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={() => handleRepeatToggle(index)}
-                  >
-                    {day}
-                  </Button>
-                ))}
+            <>
+              <div className="grid gap-2">
+                <Label>Repetir nos dias</Label>
+                <div className="flex flex-wrap gap-1">
+                  {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant={repeat[index] ? "default" : "outline"}
+                      className="w-8 h-8 p-0 rounded-full"
+                      onClick={() => handleRepeatToggle(index)}
+                    >
+                      {day}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+              
+              <div className="grid gap-2">
+                <Label>Escolher ícone</Label>
+                <div className="grid grid-cols-6 gap-2">
+                  {TASK_ICONS.map((icon) => {
+                    const IconComponent = icon.component;
+                    return (
+                      <div
+                        key={icon.name}
+                        onClick={() => setSelectedIcon(icon.name)}
+                        className={`flex items-center justify-center p-2 rounded-md cursor-pointer border ${
+                          selectedIcon === icon.name 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <IconComponent className="h-5 w-5" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
           
           {/* Todo-specific options */}

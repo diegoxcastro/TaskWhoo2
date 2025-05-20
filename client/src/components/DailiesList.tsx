@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { useTasks } from "@/contexts/TasksContext";
 import { Daily } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { PlusCircle, Bell } from "lucide-react";
+import { 
+  PlusCircle, CheckCircle, Clock, Activity, Dumbbell, Sun, 
+  Moon, Coffee, Book, Music, Heart, Globe, Star 
+} from "lucide-react";
 
 interface DailiesListProps {
   dailies: Daily[];
@@ -23,6 +26,25 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
       case 'medium': return 'border-l-4 border-amber-500';
       case 'hard': return 'border-l-4 border-red-500';
       default: return '';
+    }
+  };
+  
+  // Function to get the correct icon component based on the icon name
+  const getIconComponent = (iconName: string | null) => {
+    switch (iconName) {
+      case 'CheckCircle': return CheckCircle;
+      case 'Clock': return Clock;
+      case 'Activity': return Activity;
+      case 'Dumbbell': return Dumbbell;
+      case 'Sun': return Sun;
+      case 'Moon': return Moon;
+      case 'Coffee': return Coffee;
+      case 'Book': return Book;
+      case 'Music': return Music;
+      case 'Heart': return Heart;
+      case 'Globe': return Globe;
+      case 'Star': return Star;
+      default: return CheckCircle;
     }
   };
 

@@ -48,6 +48,7 @@ export const dailies = pgTable("dailies", {
   streak: integer("streak").notNull().default(0),
   // Weekdays when this daily is active (0-6, Sunday is 0)
   repeat: json("repeat").$type<boolean[]>().notNull().default([true, true, true, true, true, true, true]),
+  icon: text("icon").default("CheckCircle"),
   createdAt: timestamp("created_at").defaultNow(),
   lastCompleted: timestamp("last_completed")
 });
