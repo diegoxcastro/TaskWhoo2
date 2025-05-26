@@ -6,9 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { TasksProvider } from "@/contexts/TasksContext";
 import Dashboard from "@/pages/Dashboard";
+import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
-import NotFound from "@/pages/not-found";
+import axios from "axios";
 
 function Router() {
   return (
@@ -22,6 +23,13 @@ function Router() {
 }
 
 function App() {
+  const instance = axios.create({
+    baseURL: import.meta.env.DEV 
+      ? `http://localhost:${import.meta.env.VITE_PORT || 3000}/api` 
+      : '/api',
+    withCredentials: true
+  });
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

@@ -71,9 +71,11 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           title,
           notes: notes || undefined,
           priority,
-          repeat,
+          repeat: repeat,
           icon: selectedIcon
         };
+        
+        console.log('Criando tarefa diária:', daily);
         await createDaily(daily);
       } else if (type === 'todo') {
         const todo: InsertTodo = {

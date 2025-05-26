@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - USE_MEMORY_STORAGE=true
+      - PORT=3000
+      - DATABASE_URL=postgres://postgres:ew0iuurghbhb239ubf92fb92ufb290@n8n_postgres_1:5432/habittracker?sslmode=disable
+      - DB_TYPE=postgresdb
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=habittracker
+      - DB_USER=postgres
+      - DB_PASSWORD=ew0iuurghbhb239ubf92fb92ufb290
+      - ADMIN_USERNAME=awake
+      - ADMIN_PASSWORD=45Seo123
+      - API_KEY=Uaapo3ihgoarfboufba
+    depends_on: []
+    networks:
+      - digital_network
+
+networks:
+  digital_network:
+    external: true

@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import UserProfile from "@/components/UserProfile";
 import TasksSection from "@/components/TasksSection";
 import StatsSection from "@/components/StatsSection";
+import ImportExport from "@/components/ImportExport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
@@ -51,6 +52,7 @@ export default function Dashboard() {
           <TabsList className="mb-4">
             <TabsTrigger value="tasks">Tarefas</TabsTrigger>
             <TabsTrigger value="stats">Estatísticas</TabsTrigger>
+            <TabsTrigger value="import-export">Importar/Exportar</TabsTrigger>
           </TabsList>
           
           <TabsContent value="tasks">
@@ -59,6 +61,10 @@ export default function Dashboard() {
           
           <TabsContent value="stats">
             <StatsSection />
+          </TabsContent>
+          
+          <TabsContent value="import-export">
+            <ImportExport />
           </TabsContent>
         </Tabs>
       </div>

@@ -17,7 +17,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null); // Start with no user
   const { toast } = useToast();
   const [location, navigate] = useLocation();
 
@@ -28,6 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data) => {
       if (data) {
         setUser(data);
+      } else {
+        setUser(null);
       }
     },
     onError: () => {
@@ -50,9 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate("/");
     },
     onError: (error) => {
+      setUser(null);
       toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Please check your credentials",
+        title: "Falha no login",
+        description: "Usuário ou senha incorretos.",
         variant: "destructive",
       });
     },
@@ -73,9 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate("/");
     },
     onError: (error) => {
+      setUser(null);
       toast({
-        title: "Registration failed",
-        description: error instanceof Error ? error.message : "Please try a different username",
+        title: "Falha no registro",
+        description: "Não foi possível registrar. Tente outro nome de usuário.",
         variant: "destructive",
       });
     },
@@ -90,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       setUser(null);
       toast({
-        title: "Logout successful",
-        description: "You have been logged out",
+        title: "Logout realizado",
+        description: "Você saiu da sua conta.",
       });
       navigate("/login");
     },
@@ -104,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Redirect to login if not authenticated and trying to access protected routes
   useEffect(() => {
     if (!isLoading && !user && location !== "/login" && location !== "/register") {
       navigate("/login");

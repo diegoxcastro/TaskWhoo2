@@ -18,7 +18,33 @@ export const users = pgTable("users", {
   maxHealth: integer("max_health").notNull().default(50),
   coins: integer("coins").notNull().default(0),
   avatar: text("avatar"),
+  auth_id: text("auth_id"),
   createdAt: timestamp("created_at").defaultNow()
+});
+
+// TaskVida table - Main table for all tasks in Supabase
+// IMPORTANTE: O nome da tabela deve ser 'task_vida' em minúsculas para compatibilidade com o PostgreSQL
+export const taskVida = pgTable("task_vida", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  type: taskTypeEnum("type").notNull(), // habit, daily, or todo
+  priority: taskPriorityEnum("priority").notNull().default('easy'),
+  completed: boolean("completed").default(false),
+  dueDate: timestamp("due_date"),
+  repeat: boolean("repeat").array().notNull().default([true, true, true, true, true, true, true]), // Corrigido para array SQL
+  direction: habitDirectionEnum("direction"), // For habits
+  positive: boolean("positive"), // For habits
+  negative: boolean("negative"), // For habits
+  counterUp: integer("counter_up").default(0), // For habits
+  counterDown: integer("counter_down").default(0), // For habits
+  streak: integer("streak").default(0), // For dailies
+  strength: integer("strength").default(0), // For habits
+  lastCompleted: timestamp("last_completed"), // For dailies
+  completedAt: timestamp("completed_at"), // For todos
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
 });
 
 // Habits (positive and/or negative tasks that can be triggered multiple times)
@@ -78,9 +104,22 @@ export const activityLogs = pgTable("activity_logs", {
 });
 
 // Create insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({ 
-  id: true, 
-  createdAt: true 
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().min(3),
+  password: z.string().min(6),
+  level: z.number().positive().default(1),
+  experience: z.number().nonnegative().default(0),
+  health: z.number().positive().default(50),
+  maxHealth: z.number().positive().default(50),
+  coins: z.number().nonnegative().default(0),
+  avatar: z.string().optional(),
+  auth_id: z.string().optional(),
+});
+
+export const insertTaskVidaSchema = createInsertSchema(taskVida).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
 export const insertHabitSchema = createInsertSchema(habits).omit({ 
@@ -99,6 +138,8 @@ export const insertDailySchema = createInsertSchema(dailies).omit({
   streak: true, 
   createdAt: true, 
   lastCompleted: true 
+}).extend({
+  priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
 });
 
 export const insertTodoSchema = createInsertSchema(todos).omit({ 
@@ -107,6 +148,12 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
   completed: true, 
   createdAt: true, 
   completedAt: true 
+}).extend({
+  dueDate: z.preprocess(
+    (arg) => typeof arg === "string" ? new Date(arg) : arg,
+    z.date().optional()
+  ),
+  priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ 
@@ -117,6 +164,9 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type TaskVida = typeof taskVida.$inferSelect;
+export type InsertTaskVida = z.infer<typeof insertTaskVidaSchema>;
 
 export type Habit = typeof habits.$inferSelect;
 export type InsertHabit = z.infer<typeof insertHabitSchema>;
@@ -129,3 +179,135 @@ export type InsertTodo = z.infer<typeof insertTodoSchema>;
 
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+
+// Definição de tipos para o Supabase
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: number
+          username: string
+          password: string
+          level: number
+          experience: number
+          health: number
+          max_health: number
+          coins: number
+          avatar: string | null
+          auth_id: string | null
+          created_at: string
+        }
+        Insert: {
+          username: string
+          password: string
+          level?: number
+          experience?: number
+          health?: number
+          max_health?: number
+          coins?: number
+          avatar?: string | null
+          auth_id?: string | null
+        }
+        Update: {
+          username?: string
+          password?: string
+          level?: number
+          experience?: number
+          health?: number
+          max_health?: number
+          coins?: number
+          avatar?: string | null
+          auth_id?: string | null
+        }
+      }
+      task_vida: {
+        Row: {
+          id: number
+          user_id: number
+          title: string
+          notes: string | null
+          type: 'habit' | 'daily' | 'todo'
+          priority: 'trivial' | 'easy' | 'medium' | 'hard'
+          completed: boolean | null
+          due_date: string | null
+          repeat: any | null
+          direction: 'positive' | 'negative' | 'both' | null
+          positive: boolean | null
+          negative: boolean | null
+          counter_up: number | null
+          counter_down: number | null
+          streak: number | null
+          strength: number | null
+          last_completed: string | null
+          completed_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          user_id: number
+          title: string
+          notes?: string | null
+          type: 'habit' | 'daily' | 'todo'
+          priority?: 'trivial' | 'easy' | 'medium' | 'hard'
+          completed?: boolean | null
+          due_date?: string | null
+          repeat?: any | null
+          direction?: 'positive' | 'negative' | 'both' | null
+          positive?: boolean | null
+          negative?: boolean | null
+          counter_up?: number | null
+          counter_down?: number | null
+          streak?: number | null
+          strength?: number | null
+          last_completed?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          user_id?: number
+          title?: string
+          notes?: string | null
+          type?: 'habit' | 'daily' | 'todo'
+          priority?: 'trivial' | 'easy' | 'medium' | 'hard'
+          completed?: boolean | null
+          due_date?: string | null
+          repeat?: any | null
+          direction?: 'positive' | 'negative' | 'both' | null
+          positive?: boolean | null
+          negative?: boolean | null
+          counter_up?: number | null
+          counter_down?: number | null
+          streak?: number | null
+          strength?: number | null
+          last_completed?: string | null
+          completed_at?: string | null
+        }
+      }
+      activity_logs: {
+        Row: {
+          id: number
+          user_id: number
+          task_type: 'habit' | 'daily' | 'todo'
+          task_id: number
+          action: string
+          value: number | null
+          created_at: string | null
+        }
+        Insert: {
+          user_id: number
+          task_type: 'habit' | 'daily' | 'todo'
+          task_id: number
+          action: string
+          value?: number | null
+        }
+        Update: {
+          user_id?: number
+          task_type?: 'habit' | 'daily' | 'todo'
+          task_id?: number
+          action?: string
+          value?: number | null
+        }
+      }
+    }
+  }
+}

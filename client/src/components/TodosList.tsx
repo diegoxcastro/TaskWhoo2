@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TasksContext";
 import { Todo } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { PlusCircle, CheckCircle, Trash2 } from "lucide-react";
+import { PlusCircle, CheckCircle, Trash2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -38,13 +38,13 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
   });
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4">
-      <div className="mb-4 border-b pb-2">
+    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+      <div className="mb-4 border-b border-gray-200 pb-2">
         <div className="flex justify-between items-center">
-          <h2 className="font-heading font-semibold text-xl flex items-center">
+          <h2 className="font-heading font-semibold text-xl flex items-center text-amber-800">
             Afazeres
             {incompleteTodosCount > 0 && (
-              <span className="ml-2 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="ml-2 bg-amber-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 {incompleteTodosCount}
               </span>
             )}
@@ -55,19 +55,19 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
               <TabsList className="bg-transparent h-6 p-0">
                 <TabsTrigger 
                   value="all" 
-                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-amber-600 data-[state=active]:underline data-[state=active]:shadow-none"
                 >
                   Todos
                 </TabsTrigger>
                 <TabsTrigger 
                   value="active" 
-                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-amber-600 data-[state=active]:underline data-[state=active]:shadow-none"
                 >
                   Pendentes
                 </TabsTrigger>
                 <TabsTrigger 
                   value="completed" 
-                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:underline data-[state=active]:shadow-none"
+                  className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-amber-600 data-[state=active]:underline data-[state=active]:shadow-none"
                 >
                   Concluídos
                 </TabsTrigger>
@@ -79,11 +79,11 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
       
       {/* Add New Todo Button */}
       <button 
-        className="w-full text-left mb-4 p-3 border border-dashed border-gray-300 rounded-md hover:border-primary hover:bg-gray-50 transition-colors flex items-center"
+        className="w-full text-left mb-4 p-3 border border-dashed border-yellow-300 rounded-md hover:border-amber-500 hover:bg-yellow-100 transition-colors flex items-center"
         onClick={() => openAddTaskModal('todo')}
       >
-        <PlusCircle className="text-gray-400 mr-2 h-5 w-5" />
-        <span className="text-gray-500">Adicionar Afazer</span>
+        <PlusCircle className="text-amber-500 mr-2 h-5 w-5" />
+        <span className="text-amber-700">Adicionar Afazer</span>
       </button>
       
       {/* Incomplete Todos List */}
@@ -99,7 +99,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
             </div>
           ))
         ) : filteredTodos.length === 0 ? (
-          <div className="text-center p-4 text-gray-500">
+          <div className="text-center p-4 text-amber-700">
             {activeTab === "all" 
               ? "Nenhuma tarefa encontrada. Adicione sua primeira tarefa!"
               : activeTab === "active" 
@@ -112,6 +112,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
               key={todo.id} 
               className={cn(
                 "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
+                todo.completed ? "bg-yellow-100" : "",
                 getPriorityClass(todo.priority)
               )}
             >
@@ -124,17 +125,29 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                       checkTodo(todo.id, checked);
                     }
                   }}
-                  className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
+                  className={cn(
+                    "mt-1 mr-3 h-5 w-5 rounded-full border-2",
+                    todo.completed 
+                      ? "border-amber-500 bg-amber-500 text-white" 
+                      : "border-amber-300"
+                  )}
                 />
                 <div className="flex-grow">
                   <div className="flex justify-between">
-                    <span className={cn("font-medium", todo.completed && "line-through text-gray-500")}>{todo.title}</span>
+                    <span className={cn(
+                      "font-medium", 
+                      todo.completed 
+                        ? "line-through text-amber-400" 
+                        : "text-amber-800"
+                    )}>
+                      {todo.title}
+                    </span>
                     <div className="flex items-center">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full mr-2">
                         +{todo.priority === 'trivial' ? '1' : todo.priority === 'easy' ? '2' : todo.priority === 'medium' ? '5' : '10'}
                       </span>
                       <button 
-                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        className="text-amber-400 hover:text-red-500 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm('Tem certeza que deseja excluir esta tarefa?')) {
@@ -147,15 +160,17 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                     </div>
                   </div>
                   {todo.notes && (
-                    <p className="text-xs text-gray-500 mt-1">{todo.notes}</p>
+                    <p className="text-xs text-amber-600 mt-1">{todo.notes}</p>
                   )}
                   {todo.dueDate && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-amber-600 mt-1 flex items-center">
+                      <Calendar className="h-3 w-3 mr-1" />
                       Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
                     </p>
                   )}
                   {todo.completed && todo.completedAt && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-amber-400 mt-1 flex items-center">
+                      <CheckCircle className="h-3 w-3 mr-1" />
                       Completado em: {format(new Date(todo.completedAt), 'dd/MM/yyyy')}
                     </p>
                   )}
@@ -166,14 +181,12 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
         )}
       </div>
       
-      {/* Removido a seção separada para tarefas concluídas, pois estamos usando abas */}
-      
       {/* Empty state if no todos at all */}
       {todos.length === 0 && !isLoading && (
-        <div className="mt-6 text-center p-4 bg-gray-50 rounded-lg">
-          <CheckCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Esses são os seus Afazeres</p>
-          <p className="text-xs text-gray-400 mt-1">
+        <div className="mt-6 text-center p-4 bg-yellow-100 rounded-lg">
+          <CheckCircle className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+          <p className="text-sm text-amber-700">Esses são os seus Afazeres</p>
+          <p className="text-xs text-amber-600 mt-1">
             Afazeres concluídos são concluídos apenas uma vez. Adicione coisas em 
             sua lista para verificar em seus afazeres para aumentar o nível deles.
           </p>

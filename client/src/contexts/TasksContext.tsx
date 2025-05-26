@@ -38,22 +38,19 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [taskModalType, setTaskModalType] = useState<'habit' | 'daily' | 'todo'>('habit');
 
   // Fetch tasks only if authenticated
-  const { data: habits = [], isLoading: habitsLoading } = useQuery({
+  const { data: habits = [], isLoading: habitsLoading } = useQuery<Habit[]>({
     queryKey: ["/api/habits"],
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: isAuthenticated
   });
 
-  const { data: dailies = [], isLoading: dailiesLoading } = useQuery({
+  const { data: dailies = [], isLoading: dailiesLoading } = useQuery<Daily[]>({
     queryKey: ["/api/dailies"],
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: isAuthenticated
   });
 
-  const { data: todos = [], isLoading: todosLoading } = useQuery({
+  const { data: todos = [], isLoading: todosLoading } = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: isAuthenticated
   });
 
   // Habit mutations
@@ -156,8 +153,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", "/api/dailies", dailyData);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dailies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Daily created",
         description: "Your new daily task has been created successfully",
@@ -322,11 +320,29 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", `/api/todos/${id}/check`, { completed });
       return res.json();
     },
-    onSuccess: (data) => {
+    onMutate: async ({ id, completed }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/todos"] });
+      const previousTodos = queryClient.getQueryData<Todo[]>(["/api/todos"]);
+      if (previousTodos) {
+        queryClient.setQueryData<Todo[]>(["/api/todos"],
+          previousTodos.map(todo =>
+            todo.id === id ? { ...todo, completed } : todo
+          )
+        );
+      }
+      return { previousTodos };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(["/api/todos"], context.previousTodos);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
-      
+    },
+    onSuccess: (data) => {
       if (data.reward > 0) {
         toast({
           title: "Todo completed!",
@@ -338,13 +354,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           description: `${data.todo.title} marked as incomplete`,
         });
       }
-    },
-    onError: (error) => {
-      toast({
-        title: "Failed to check todo",
-        description: error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
-      });
     },
   });
 
