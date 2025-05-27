@@ -1,16 +1,121 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTasks } from "@/contexts/TasksContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
+import axios from "axios";
+import type { ActivityLog } from "@shared/schema";
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
+const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 export default function StatsSection() {
   const { habits, dailies, todos } = useTasks();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Stats calculations
+  useEffect(() => {
+    async function fetchLogs() {
+      setLoading(true);
+      try {
+        const { data } = await axios.get("/api/stats/activity", {
+          headers: {
+            "x-api-key": import.meta.env.VITE_API_KEY || "Uaapo3ihgoarfboufba",
+          },
+        });
+        setActivityLogs(data);
+      } catch (e) {
+        setActivityLogs([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchLogs();
+  }, []);
+
+  // --- Métricas úteis ---
+  // Dias únicos com atividade
+  const activeDays = useMemo(() => {
+    const days = new Set(activityLogs.map(log => new Date(log.createdAt ?? '').toDateString()));
+    return days.size;
+  }, [activityLogs]);
+
+  // XP e moedas ganhos no período
+  const xpGained = useMemo(() => activityLogs.filter(l => (l.value ?? 0) > 0 && ["completed", "scored_up"].includes(l.action)).reduce((acc, l) => acc + (l.value ?? 0), 0), [activityLogs]);
+  const coinsGained = useMemo(() => activityLogs.filter(l => (l.value ?? 0) > 0 && ["completed", "scored_up"].includes(l.action)).reduce((acc, l) => acc + Math.floor((l.value ?? 0) / 2), 0), [activityLogs]);
+  // Penalidades sofridas (vida perdida)
+  const healthLost = useMemo(() => activityLogs.filter(l => (l.value ?? 0) < 0 && ["missed", "scored_down"].includes(l.action)).reduce((acc, l) => acc + (l.value ?? 0), 0), [activityLogs]);
+
+  // Tarefas concluídas por tipo
+  const completedByType = useMemo(() => {
+    const result: Record<string, number> = { habit: 0, daily: 0, todo: 0 };
+    activityLogs.forEach(l => {
+      if (["completed", "scored_up"].includes(l.action)) {
+        result[l.taskType] = (result[l.taskType] || 0) + 1;
+      }
+    });
+    return result;
+  }, [activityLogs]);
+
+  // Percentual de tarefas concluídas no prazo (todos)
+  const todosCompleted = todos.filter(t => t.completed);
+  const todosOnTime = todosCompleted.filter(t => t.dueDate && t.completedAt && new Date(t.completedAt ?? '').getTime() <= new Date(t.dueDate ?? '').getTime());
+  const todosOnTimePercent = todosCompleted.length > 0 ? Math.round((todosOnTime.length / todosCompleted.length) * 100) : 0;
+
+  // Streaks (sequência de dias com todas as diárias concluídas)
+  const streaks = useMemo(() => {
+    const daysMap: Record<string, number> = {};
+    activityLogs.forEach(l => {
+      if (l.taskType === "daily" && l.action === "completed") {
+        const day = new Date(l.createdAt ?? '').toDateString();
+        daysMap[day] = (daysMap[day] || 0) + 1;
+      }
+    });
+    const allDailiesPerDay = Object.entries(daysMap).map(([day, count]) => ({ day, count }));
+    const totalDailies = dailies.length;
+    let currentStreak = 0, maxStreak = 0;
+    let streakData: { day: string, streak: number }[] = [];
+    allDailiesPerDay.sort((a, b) => new Date(a.day).getTime() - new Date(b.day).getTime());
+    let lastDate: string | null = null;
+    allDailiesPerDay.forEach(({ day, count }) => {
+      if (count === totalDailies && totalDailies > 0) {
+        if (lastDate) {
+          const diff = (new Date(day).getTime() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24);
+          if (diff === 1) {
+            currentStreak++;
+          } else {
+            currentStreak = 1;
+          }
+        } else {
+          currentStreak = 1;
+        }
+        maxStreak = Math.max(maxStreak, currentStreak);
+        streakData.push({ day, streak: currentStreak });
+        lastDate = day;
+      } else {
+        currentStreak = 0;
+        lastDate = null;
+      }
+    });
+    return { current: currentStreak, max: maxStreak, streakData };
+  }, [activityLogs, dailies.length]);
+
+  // Gráfico de streaks
+  const streakChartData = streaks.streakData.map(s => ({
+    name: s.day.split(" ")[1] + "/" + s.day.split(" ")[2],
+    streak: s.streak
+  }));
+
+  // Gráfico de tarefas concluídas por dia da semana
+  const weeklyActivityData = weekDays.map((day, idx) => ({
+    day,
+    tarefas: activityLogs.filter(log => new Date(log.createdAt ?? '').getDay() === idx && ["completed", "scored_up"].includes(log.action)).length
+  }));
+
+  // Gráficos e métricas já existentes
   const totalHabits = habits.length;
   const totalDailies = dailies.length;
   const totalTodos = todos.length;
@@ -18,31 +123,15 @@ export default function StatsSection() {
   const completedDailies = dailies.filter(daily => daily.completed).length;
   const todoCompletionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
   const dailyCompletionRate = totalDailies > 0 ? Math.round((completedDailies / totalDailies) * 100) : 0;
-  
-  // Sample data for charts
   const taskTypeData = [
     { name: 'Hábitos', value: totalHabits },
     { name: 'Diárias', value: totalDailies },
     { name: 'Afazeres', value: totalTodos }
   ];
-  
   const completionData = [
     { name: 'Diárias', completas: completedDailies, pendentes: totalDailies - completedDailies },
     { name: 'Afazeres', completas: completedTodos, pendentes: totalTodos - completedTodos }
   ];
-
-  // Weekly activity mock data (you would replace this with real data)
-  const weeklyActivityData = [
-    { day: 'Dom', tarefas: 2 },
-    { day: 'Seg', tarefas: 5 },
-    { day: 'Ter', tarefas: 7 },
-    { day: 'Qua', tarefas: 3 },
-    { day: 'Qui', tarefas: 6 },
-    { day: 'Sex', tarefas: 4 },
-    { day: 'Sáb', tarefas: 1 }
-  ];
-  
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   return (
     <div className="container mx-auto pb-20 px-4">
@@ -112,39 +201,38 @@ export default function StatsSection() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Estatísticas</CardTitle>
+                <CardTitle className="text-lg">Estatísticas Avançadas</CardTitle>
                 <CardDescription>Resumo da sua produtividade</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Taxa de conclusão de diárias</p>
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${dailyCompletionRate}%` }}></div>
-                      </div>
-                      <span className="ml-2 text-sm font-medium">{dailyCompletionRate}%</span>
-                    </div>
+                    <p className="text-sm text-gray-500">Dias ativos</p>
+                    <p className="text-2xl font-bold mt-1">{activeDays}</p>
                   </div>
-                  
                   <div>
-                    <p className="text-sm text-gray-500">Taxa de conclusão de afazeres</p>
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${todoCompletionRate}%` }}></div>
-                      </div>
-                      <span className="ml-2 text-sm font-medium">{todoCompletionRate}%</span>
-                    </div>
+                    <p className="text-sm text-gray-500">Streak atual / máximo</p>
+                    <p className="text-2xl font-bold mt-1">{streaks.current} / {streaks.max}</p>
                   </div>
-                  
                   <div>
-                    <p className="text-sm text-gray-500">Total de XP acumulada</p>
-                    <p className="text-2xl font-bold mt-1">{user?.experience || 0}</p>
+                    <p className="text-sm text-gray-500">XP ganhos (período)</p>
+                    <p className="text-2xl font-bold mt-1">{xpGained}</p>
                   </div>
-                  
                   <div>
-                    <p className="text-sm text-gray-500">Nível atual</p>
-                    <p className="text-2xl font-bold mt-1">{user?.level || 1}</p>
+                    <p className="text-sm text-gray-500">Moedas ganhas (período)</p>
+                    <p className="text-2xl font-bold mt-1">{coinsGained}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Vida perdida (penalidades)</p>
+                    <p className="text-2xl font-bold mt-1">{healthLost}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Afazeres concluídos no prazo</p>
+                    <p className="text-2xl font-bold mt-1">{todosOnTimePercent}%</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Tarefas concluídas por tipo</p>
+                    <p className="text-sm mt-1">Hábitos: {completedByType.habit} | Diárias: {completedByType.daily} | Afazeres: {completedByType.todo}</p>
                   </div>
                 </div>
               </CardContent>
@@ -172,6 +260,26 @@ export default function StatsSection() {
                     <Legend />
                     <Bar dataKey="tarefas" fill="#8884d8" name="Tarefas Concluídas" />
                   </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Streaks (Sequência de Dias)</CardTitle>
+              <CardDescription>Sequência de dias com todas as diárias concluídas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={streakChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="streak" stroke="#8884d8" name="Streak" />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
