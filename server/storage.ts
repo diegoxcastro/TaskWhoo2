@@ -407,10 +407,9 @@ export class SupabaseStorage implements IStorage {
         eq(taskVida.userId, userId),
         eq(taskVida.type, 'daily')
       ))
-      .orderBy(asc(taskVida.createdAt));
-    
+      .orderBy(asc(taskVida.order), asc(taskVida.createdAt));
     // Convert TaskVida to Daily
-    return tasks.map(task => ({
+    return tasks.map((task: any) => ({
       id: task.id,
       userId: task.userId,
       title: task.title,
@@ -419,9 +418,10 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       streak: task.streak || 0,
       repeat: task.repeat || [true, true, true, true, true, true, true],
-      icon: "CheckCircle",
+      icon: task.icon || "CheckCircle",
       createdAt: task.createdAt,
-      lastCompleted: task.lastCompleted || null
+      lastCompleted: task.lastCompleted || null,
+      order: typeof task.order === 'number' ? task.order : 0
     }));
   }
 
@@ -448,29 +448,49 @@ export class SupabaseStorage implements IStorage {
       repeat: task.repeat || [true, true, true, true, true, true, true],
       icon: "CheckCircle",
       createdAt: task.createdAt,
-      lastCompleted: task.lastCompleted || null
+      lastCompleted: task.lastCompleted || null,
+      order: typeof task.order === 'number' ? task.order : 0
     };
   }
 
   async createDaily(userId: number, dailyData: InsertDaily): Promise<Daily> {
-    const id = this.dailyId++;
-    const now = new Date();
-    const repeatArray: boolean[] = Array.isArray(dailyData.repeat) ? dailyData.repeat : [true, true, true, true, true, true, true];
-    const daily: Daily = {
-      id,
-      userId,
-      title: dailyData.title,
-      notes: dailyData.notes ?? null,
-      priority: dailyData.priority ?? 'easy',
-      completed: false,
-      streak: 0,
-      repeat: repeatArray,
-      icon: dailyData.icon ?? "CheckCircle",
-      createdAt: now,
-      lastCompleted: null
+    if (useMemoryStorage) {
+      return this.memStorage.createDaily(userId, dailyData);
+    }
+    // Buscar o maior valor de order atual
+    const maxOrder = await db
+      .select({ max: db.fn.max(taskVida.order) })
+      .from(taskVida)
+      .where(and(eq(taskVida.userId, userId), eq(taskVida.type, 'daily')))
+      .then(res => res[0]?.max ?? 0);
+    const [task] = await db
+      .insert(taskVida)
+      .values({
+        userId,
+        title: dailyData.title,
+        notes: dailyData.notes,
+        type: 'daily',
+        priority: dailyData.priority,
+        completed: false,
+        repeat: dailyData.repeat,
+        icon: dailyData.icon,
+        order: maxOrder + 1
+      })
+      .returning();
+    return {
+      id: task.id,
+      userId: task.userId,
+      title: task.title,
+      notes: task.notes || null,
+      priority: task.priority,
+      completed: task.completed || false,
+      streak: task.streak || 0,
+      repeat: task.repeat || [true, true, true, true, true, true, true],
+      icon: task.icon || "CheckCircle",
+      createdAt: task.createdAt,
+      lastCompleted: task.lastCompleted || null,
+      order: typeof task.order === 'number' ? task.order : 0
     };
-    this.dailies.set(id, daily);
-    return daily;
   }
 
   async updateDaily(id: number, dailyData: Partial<Daily>): Promise<Daily | undefined> {
@@ -528,7 +548,8 @@ export class SupabaseStorage implements IStorage {
         repeat: task.repeat || [true, true, true, true, true, true, true],
         icon: "CheckCircle",
         createdAt: task.createdAt,
-        lastCompleted: task.lastCompleted || null
+        lastCompleted: task.lastCompleted || null,
+        order: typeof task.order === 'number' ? task.order : 0
       };
     } catch (error) {
       console.error("Erro ao atualizar daily:", error);
@@ -690,10 +711,9 @@ export class SupabaseStorage implements IStorage {
         eq(taskVida.userId, userId),
         eq(taskVida.type, 'todo')
       ))
-      .orderBy(asc(taskVida.createdAt));
-    
+      .orderBy(asc(taskVida.order), asc(taskVida.createdAt));
     // Convert TaskVida to Todo
-    return tasks.map(task => ({
+    return tasks.map((task: any) => ({
       id: task.id,
       userId: task.userId,
       title: task.title,
@@ -702,7 +722,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       createdAt: task.createdAt,
-      completedAt: task.completedAt || null
+      completedAt: task.completedAt || null,
+      order: typeof task.order === 'number' ? task.order : 0
     }));
   }
 
@@ -727,11 +748,21 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       createdAt: task.createdAt,
-      completedAt: task.completedAt || null
+      completedAt: task.completedAt || null,
+      order: typeof task.order === 'number' ? task.order : 0
     };
   }
 
   async createTodo(userId: number, todoData: InsertTodo): Promise<Todo> {
+    if (useMemoryStorage) {
+      return this.memStorage.createTodo(userId, todoData);
+    }
+    // Buscar o maior valor de order atual
+    const maxOrder = await db
+      .select({ max: db.fn.max(taskVida.order) })
+      .from(taskVida)
+      .where(and(eq(taskVida.userId, userId), eq(taskVida.type, 'todo')))
+      .then(res => res[0]?.max ?? 0);
     const [task] = await db
       .insert(taskVida)
       .values({
@@ -741,11 +772,10 @@ export class SupabaseStorage implements IStorage {
         type: 'todo',
         priority: todoData.priority,
         completed: false,
-        dueDate: todoData.dueDate
+        dueDate: todoData.dueDate,
+        order: maxOrder + 1
       })
       .returning();
-    
-    // Convert TaskVida to Todo
     return {
       id: task.id,
       userId: task.userId,
@@ -755,7 +785,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       createdAt: task.createdAt,
-      completedAt: task.completedAt || null
+      completedAt: task.completedAt || null,
+      order: typeof task.order === 'number' ? task.order : 0
     };
   }
 
@@ -794,7 +825,8 @@ export class SupabaseStorage implements IStorage {
         completed: task.completed || false,
         dueDate: task.dueDate || null,
         createdAt: task.createdAt,
-        completedAt: task.completedAt || null
+        completedAt: task.completedAt || null,
+        order: typeof task.order === 'number' ? task.order : 0
       };
     } catch (error) {
       console.error("Erro ao atualizar todo:", error);
@@ -1158,7 +1190,8 @@ export class MemStorage implements IStorage {
         repeat: task.repeat || [true, true, true, true, true, true, true],
         icon: "CheckCircle",
         createdAt: task.createdAt,
-        lastCompleted: task.lastCompleted || null
+        lastCompleted: task.lastCompleted || null,
+        order: typeof task.order === 'number' ? task.order : 0
       };
     } catch (error) {
       console.error("Erro ao atualizar daily:", error);
@@ -1343,7 +1376,8 @@ export class MemStorage implements IStorage {
         completed: task.completed || false,
         dueDate: task.dueDate || null,
         createdAt: task.createdAt,
-        completedAt: task.completedAt || null
+        completedAt: task.completedAt || null,
+        order: typeof task.order === 'number' ? task.order : 0
       };
     } catch (error) {
       console.error("Erro ao atualizar todo:", error);

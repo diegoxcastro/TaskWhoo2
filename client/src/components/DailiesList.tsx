@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import {
   PlusCircle, CheckCircle, Clock, Activity, Dumbbell, Sun, 
   Moon, Coffee, Book, Music, Heart, Globe, Star 
 } from "lucide-react";
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import axios from 'axios';
 
 interface DailiesListProps {
   dailies: Daily[];
@@ -18,9 +22,27 @@ interface DailiesListProps {
   incompleteDailiesCount: number;
 }
 
+function SortableDaily({ daily, children }: { daily: Daily, children: (listeners: any) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: daily.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {children(listeners)}
+    </div>
+  );
+}
+
 export default function DailiesList({ dailies, isLoading, incompleteDailiesCount }: DailiesListProps) {
   const { openAddTaskModal, checkDaily, deleteDaily } = useTasks();
   const [activeTab, setActiveTab] = useState("all");
+  const [items, setItems] = useState(dailies.map(d => d.id));
+
+  useEffect(() => { setItems(dailies.map(d => d.id)); }, [dailies]);
 
   // Get priority class based on daily priority
   const getPriorityClass = (priority: string) => {
@@ -59,6 +81,18 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
     if (activeTab === "completed") return daily.completed;
     return true;
   });
+
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = items.indexOf(active.id);
+      const newIndex = items.indexOf(over.id);
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      setItems(newItems);
+      // Atualiza ordem no backend
+      await axios.patch('/api/dailies/order', { ids: newItems });
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
@@ -136,69 +170,84 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                 : "Nenhuma tarefa concluída ainda."}
           </div>
         ) : (
-          filteredDailies.map((daily) => (
-            <div 
-              key={daily.id} 
-              className={cn(
-                "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
-                daily.completed ? "bg-gray-50" : "",
-                getPriorityClass(daily.priority)
-              )}
-            >
-              <div className="flex items-start">
-                <Checkbox
-                  id={`daily-${daily.id}`}
-                  checked={daily.completed}
-                  onCheckedChange={(checked) => {
-                    if (typeof checked === 'boolean') {
-                      checkDaily(daily.id, checked);
-                    }
-                  }}
-                  className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
-                />
-                <div className="flex-grow">
-                  <div className="flex justify-between">
-                    <div className="flex items-center">
-                      {daily.icon && (
-                        <div className="mr-2 text-primary">
-                          {React.createElement(getIconComponent(daily.icon), { size: 16 })}
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items} strategy={verticalListSortingStrategy}>
+              {filteredDailies.map((daily) => (
+                <SortableDaily key={daily.id} daily={daily}>
+                  {(listeners) => (
+                    <div className={cn(
+                      "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
+                      daily.completed ? "bg-gray-50" : "",
+                      getPriorityClass(daily.priority)
+                    )}>
+                      <div className="flex items-start">
+                        {/* Drag handle */}
+                        <button
+                          className="mr-2 cursor-grab text-gray-400 hover:text-primary"
+                          style={{ background: 'none', border: 'none', padding: 0 }}
+                          {...listeners}
+                          tabIndex={-1}
+                          aria-label="Mover tarefa"
+                        >
+                          <span style={{ fontSize: 18, lineHeight: 1 }}>☰</span>
+                        </button>
+                        <Checkbox
+                          id={`daily-${daily.id}`}
+                          checked={daily.completed}
+                          onCheckedChange={(checked) => {
+                            if (typeof checked === 'boolean') {
+                              checkDaily(daily.id, checked);
+                            }
+                          }}
+                          className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
+                        />
+                        <div className="flex-grow">
+                          <div className="flex justify-between">
+                            <div className="flex items-center">
+                              {daily.icon && (
+                                <div className="mr-2 text-primary">
+                                  {React.createElement(getIconComponent(daily.icon), { size: 16 })}
+                                </div>
+                              )}
+                              <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
+                                {daily.title}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">
+                                +{daily.priority === 'trivial' ? '1' : daily.priority === 'easy' ? '2' : daily.priority === 'medium' ? '5' : '10'}
+                              </span>
+                              <button 
+                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Tem certeza que deseja excluir esta tarefa diária?')) {
+                                    deleteDaily(daily.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          {daily.notes && (
+                            <p className="text-xs text-gray-500 mt-1">{daily.notes}</p>
+                          )}
+                          {daily.streak > 0 && (
+                            <div className="flex items-center mt-1">
+                              <span className="text-xs text-amber-600 font-medium">
+                                Sequência: {daily.streak} {daily.streak === 1 ? 'dia' : 'dias'}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
-                        {daily.title}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">
-                        +{daily.priority === 'trivial' ? '1' : daily.priority === 'easy' ? '2' : daily.priority === 'medium' ? '5' : '10'}
-                      </span>
-                      <button 
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm('Tem certeza que deseja excluir esta tarefa diária?')) {
-                            deleteDaily(daily.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {daily.notes && (
-                    <p className="text-xs text-gray-500 mt-1">{daily.notes}</p>
-                  )}
-                  {daily.streak > 0 && (
-                    <div className="flex items-center mt-1">
-                      <span className="text-xs text-amber-600 font-medium">
-                        🔥 Sequência: {daily.streak} {daily.streak === 1 ? 'dia' : 'dias'}
-                      </span>
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          ))
+                </SortableDaily>
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>

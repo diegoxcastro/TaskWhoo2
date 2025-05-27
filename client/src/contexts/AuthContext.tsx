@@ -17,23 +17,47 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null); // Start with no user
+  const [user, setUser] = useState<User | null>(() => {
+    // Try to restore user from localStorage on initial load
+    try {
+      const savedUser = localStorage.getItem('habittracker_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   const { toast } = useToast();
   const [location, navigate] = useLocation();
+
+  // Sync user state with localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('habittracker_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('habittracker_user');
+    }
+  }, [user]);
 
   // Check if user is already authenticated
   const { data, isLoading } = useQuery({
     queryKey: ["/api/auth/check"],
-    retry: false,
+    retry: 1, // Retry once in case of network issues
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     onSuccess: (data) => {
       if (data) {
         setUser(data);
-      } else {
+      } else if (!user) {
+        // Only clear user if we don't have one stored locally
         setUser(null);
       }
     },
-    onError: () => {
-      setUser(null);
+    onError: (error) => {
+      console.warn('Auth check failed:', error);
+      // Don't immediately clear user on error - keep localStorage user if available
+      // Only clear if we're sure the user is not authenticated
+      if (!user) {
+        setUser(null);
+      }
     }
   });
 
@@ -109,8 +133,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    // Only redirect to login if we're sure there's no authenticated user
+    // and we're not already on auth pages
     if (!isLoading && !user && location !== "/login" && location !== "/register") {
-      navigate("/login");
+      // Give a small delay to allow auth check to complete
+      const timer = setTimeout(() => {
+        if (!user) {
+          navigate("/login");
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isLoading, user, location, navigate]);
 

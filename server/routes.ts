@@ -59,12 +59,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: { 
-        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for better persistence
         secure: false, // HTTP, não usar secure
         sameSite: "lax", // 'lax' para dev/local sem SSL
+        httpOnly: false, // Allow client-side access for better persistence
       },
       store: new MemoryStoreSession({
-        checkPeriod: 86400000 // prune expired entries every 24h
+        checkPeriod: 86400000, // prune expired entries every 24h
+        max: 1000, // Maximum number of sessions to store
+        ttl: 7 * 24 * 60 * 60 * 1000, // 7 days TTL
+        dispose: function(key: string, val: any) {
+          // Optional: log when sessions are disposed
+          console.log('Session disposed:', key);
+        }
       }),
     })
   );
@@ -601,6 +608,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para atualizar ordem das dailies
+  app.patch("/api/dailies/order", isAuthenticated, async (req, res) => {
+    const userId = req.user.id;
+    const { ids } = req.body; // array de IDs na nova ordem
+    if (!Array.isArray(ids)) return res.status(400).json({ message: "Formato inválido" });
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        await storage.updateDaily(ids[i], { order: i });
+      }
+      return res.json({ message: "Ordem das dailies atualizada" });
+    } catch (error) {
+      return res.status(500).json({ message: "Erro ao atualizar ordem das dailies", error: String(error) });
+    }
+  });
+
   // === Todo Routes ===
   app.get("/api/todos", isAuthenticated, async (req, res) => {
     try {
@@ -729,6 +751,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Endpoint para atualizar ordem dos todos
+  app.patch("/api/todos/order", isAuthenticated, async (req, res) => {
+    const userId = req.user.id;
+    const { ids } = req.body; // array de IDs na nova ordem
+    if (!Array.isArray(ids)) return res.status(400).json({ message: "Formato inválido" });
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        await storage.updateTodo(ids[i], { order: i });
+      }
+      return res.json({ message: "Ordem dos todos atualizada" });
+    } catch (error) {
+      return res.status(500).json({ message: "Erro ao atualizar ordem dos todos", error: String(error) });
     }
   });
 

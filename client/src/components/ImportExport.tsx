@@ -23,8 +23,8 @@ const ImportExport = () => {
       const response = await axios.get(`/api/export/${format}`, {
         responseType: 'blob', // Importante para baixar o arquivo
         headers: {
-          'x-api-key': import.meta.env.VITE_API_KEY // Adicionar o cabeçalho da API Key
-        }
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba',
+        },
       });
       
       // Criar um URL para o blob
@@ -84,7 +84,7 @@ const ImportExport = () => {
       const response = await axios.post(`/api/import/${importType}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'x-api-key': import.meta.env.VITE_API_KEY // Adicionar o cabeçalho da API Key
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba',
         }
       });
       

@@ -45,6 +45,7 @@ export const taskVida = pgTable("task_vida", {
   completedAt: timestamp("completed_at"), // For todos
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
+  order: integer("order").notNull().default(0)
 });
 
 // Habits (positive and/or negative tasks that can be triggered multiple times)
@@ -76,7 +77,8 @@ export const dailies = pgTable("dailies", {
   repeat: json("repeat").$type<boolean[]>().notNull().default([true, true, true, true, true, true, true]),
   icon: text("icon").default("CheckCircle"),
   createdAt: timestamp("created_at").defaultNow(),
-  lastCompleted: timestamp("last_completed")
+  lastCompleted: timestamp("last_completed"),
+  order: integer("order").notNull().default(0)
 });
 
 // Todos (one-time tasks)
@@ -89,7 +91,8 @@ export const todos = pgTable("todos", {
   completed: boolean("completed").notNull().default(false),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
-  completedAt: timestamp("completed_at")
+  completedAt: timestamp("completed_at"),
+  order: integer("order").notNull().default(0)
 });
 
 // Activity log for tracking history and statistics
@@ -243,6 +246,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           updated_at: string | null
+          order: number | null
         }
         Insert: {
           user_id: number
@@ -262,6 +266,7 @@ export type Database = {
           strength?: number | null
           last_completed?: string | null
           completed_at?: string | null
+          order?: number | null
         }
         Update: {
           user_id?: number
@@ -281,6 +286,7 @@ export type Database = {
           strength?: number | null
           last_completed?: string | null
           completed_at?: string | null
+          order?: number | null
         }
       }
       activity_logs: {

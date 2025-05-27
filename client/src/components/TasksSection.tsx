@@ -29,7 +29,7 @@ export default function TasksSection() {
   );
   
   const filteredTodos = todos.filter(todo => 
-    todo.title.toLowerCase().includes(searchQuery.toLowerCase())
+    !todo.completed && todo.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
   // Count incomplete dailies

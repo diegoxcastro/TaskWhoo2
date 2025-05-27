@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TasksContext";
@@ -7,6 +7,10 @@ import { cn } from "@/lib/utils";
 import { PlusCircle, CheckCircle, Trash2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import axios from 'axios';
 
 interface TodosListProps {
   todos: Todo[];
@@ -14,9 +18,39 @@ interface TodosListProps {
   incompleteTodosCount: number;
 }
 
+function SortableTodo({ todo, children }: { todo: Todo, children: (listeners: any) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {children(listeners)}
+    </div>
+  );
+}
+
 export default function TodosList({ todos, isLoading, incompleteTodosCount }: TodosListProps) {
   const { openAddTaskModal, checkTodo, deleteTodo } = useTasks();
   const [activeTab, setActiveTab] = useState("all");
+  const [items, setItems] = useState(todos.map(t => t.id));
+
+  useEffect(() => { setItems(todos.map(t => t.id)); }, [todos]);
+
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = items.indexOf(active.id);
+      const newIndex = items.indexOf(over.id);
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      setItems(newItems);
+      // Atualiza ordem no backend
+      await axios.patch('/api/todos/order', { ids: newItems });
+    }
+  };
 
   // Get priority class based on todo priority
   const getPriorityClass = (priority: string) => {
@@ -107,77 +141,92 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                 : "Nenhuma tarefa concluída ainda."}
           </div>
         ) : (
-          filteredTodos.map((todo) => (
-            <div 
-              key={todo.id} 
-              className={cn(
-                "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
-                todo.completed ? "bg-yellow-100" : "",
-                getPriorityClass(todo.priority)
-              )}
-            >
-              <div className="flex items-start">
-                <Checkbox
-                  id={`todo-${todo.id}`}
-                  checked={todo.completed}
-                  onCheckedChange={(checked) => {
-                    if (typeof checked === 'boolean') {
-                      checkTodo(todo.id, checked);
-                    }
-                  }}
-                  className={cn(
-                    "mt-1 mr-3 h-5 w-5 rounded-full border-2",
-                    todo.completed 
-                      ? "border-amber-500 bg-amber-500 text-white" 
-                      : "border-amber-300"
-                  )}
-                />
-                <div className="flex-grow">
-                  <div className="flex justify-between">
-                    <span className={cn(
-                      "font-medium", 
-                      todo.completed 
-                        ? "line-through text-amber-400" 
-                        : "text-amber-800"
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items} strategy={verticalListSortingStrategy}>
+              {filteredTodos.map((todo) => (
+                <SortableTodo key={todo.id} todo={todo}>
+                  {(listeners) => (
+                    <div className={cn(
+                      "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
+                      todo.completed ? "bg-yellow-100" : "",
+                      getPriorityClass(todo.priority)
                     )}>
-                      {todo.title}
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full mr-2">
-                        +{todo.priority === 'trivial' ? '1' : todo.priority === 'easy' ? '2' : todo.priority === 'medium' ? '5' : '10'}
-                      </span>
-                      <button 
-                        className="text-amber-400 hover:text-red-500 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm('Tem certeza que deseja excluir esta tarefa?')) {
-                            deleteTodo(todo.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-start">
+                        {/* Drag handle */}
+                        <button
+                          className="mr-2 cursor-grab text-amber-400 hover:text-amber-600"
+                          style={{ background: 'none', border: 'none', padding: 0 }}
+                          {...listeners}
+                          tabIndex={-1}
+                          aria-label="Mover tarefa"
+                        >
+                          <span style={{ fontSize: 18, lineHeight: 1 }}>☰</span>
+                        </button>
+                        <Checkbox
+                          id={`todo-${todo.id}`}
+                          checked={todo.completed}
+                          onCheckedChange={(checked) => {
+                            if (typeof checked === 'boolean') {
+                              checkTodo(todo.id, checked);
+                            }
+                          }}
+                          className={cn(
+                            "mt-1 mr-3 h-5 w-5 rounded-full border-2",
+                            todo.completed 
+                              ? "border-amber-500 bg-amber-500 text-white" 
+                              : "border-amber-300"
+                          )}
+                        />
+                        <div className="flex-grow">
+                          <div className="flex justify-between">
+                            <span className={cn(
+                              "font-medium", 
+                              todo.completed 
+                                ? "line-through text-amber-400" 
+                                : "text-amber-800"
+                            )}>
+                              {todo.title}
+                            </span>
+                            <div className="flex items-center">
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full mr-2">
+                                +{todo.priority === 'trivial' ? '1' : todo.priority === 'easy' ? '2' : todo.priority === 'medium' ? '5' : '10'}
+                              </span>
+                              <button 
+                                className="text-amber-400 hover:text-red-500 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Tem certeza que deseja excluir esta tarefa?')) {
+                                    deleteTodo(todo.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          {todo.notes && (
+                            <p className="text-xs text-amber-600 mt-1">{todo.notes}</p>
+                          )}
+                          {todo.dueDate && (
+                            <p className="text-xs text-amber-600 mt-1 flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
+                            </p>
+                          )}
+                          {todo.completed && todo.completedAt && (
+                            <p className="text-xs text-amber-400 mt-1 flex items-center">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Completado em: {format(new Date(todo.completedAt), 'dd/MM/yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  {todo.notes && (
-                    <p className="text-xs text-amber-600 mt-1">{todo.notes}</p>
                   )}
-                  {todo.dueDate && (
-                    <p className="text-xs text-amber-600 mt-1 flex items-center">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
-                    </p>
-                  )}
-                  {todo.completed && todo.completedAt && (
-                    <p className="text-xs text-amber-400 mt-1 flex items-center">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Completado em: {format(new Date(todo.completedAt), 'dd/MM/yyyy')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
+                </SortableTodo>
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
       

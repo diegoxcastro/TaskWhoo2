@@ -22,9 +22,3 @@ services:
       - ADMIN_PASSWORD=45Seo123
       - API_KEY=Uaapo3ihgoarfboufba
     depends_on: []
-    networks:
-      - digital_network
-
-networks:
-  digital_network:
-    external: true
