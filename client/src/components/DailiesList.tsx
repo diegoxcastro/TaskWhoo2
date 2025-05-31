@@ -38,7 +38,7 @@ function SortableDaily({ daily, children }: { daily: Daily, children: (listeners
 }
 
 export default function DailiesList({ dailies, isLoading, incompleteDailiesCount }: DailiesListProps) {
-  const { openAddTaskModal, checkDaily, deleteDaily } = useTasks();
+  const { openAddTaskModal, checkDaily, deleteDaily, openEditTaskModal } = useTasks();
   const [activeTab, setActiveTab] = useState("all");
   const [items, setItems] = useState(dailies.map(d => d.id));
 
@@ -175,11 +175,15 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
               {filteredDailies.map((daily) => (
                 <SortableDaily key={daily.id} daily={daily}>
                   {(listeners) => (
-                    <div className={cn(
-                      "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
-                      daily.completed ? "bg-gray-50" : "",
-                      getPriorityClass(daily.priority)
-                    )}>
+                    <div
+                      className={cn(
+                        "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
+                        daily.completed ? "bg-gray-50" : "",
+                        getPriorityClass(daily.priority)
+                      )}
+                      onClick={() => openEditTaskModal('daily', daily)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <div className="flex items-start">
                         {/* Drag handle */}
                         <button

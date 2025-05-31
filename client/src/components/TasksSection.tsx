@@ -5,6 +5,7 @@ import HabitsList from "@/components/HabitsList";
 import DailiesList from "@/components/DailiesList";
 import TodosList from "@/components/TodosList";
 import AddTaskModal from "@/components/AddTaskModal";
+import EditTaskModal from "@/components/EditTaskModal";
 
 export default function TasksSection() {
   const { 
@@ -14,7 +15,11 @@ export default function TasksSection() {
     isLoading,
     showAddTaskModal,
     taskModalType,
-    closeAddTaskModal
+    closeAddTaskModal,
+    showEditTaskModal,
+    editTaskModalType,
+    editTask,
+    closeEditTaskModal
   } = useTasks();
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +99,14 @@ export default function TasksSection() {
         <AddTaskModal 
           type={taskModalType} 
           onClose={closeAddTaskModal} 
+        />
+      )}
+      {/* Edit Task Modal */}
+      {showEditTaskModal && editTaskModalType && editTask && (
+        <EditTaskModal 
+          type={editTaskModalType}
+          task={editTask}
+          onClose={closeEditTaskModal}
         />
       )}
     </main>

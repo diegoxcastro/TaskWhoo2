@@ -26,6 +26,11 @@ interface TasksContextValue {
   taskModalType: 'habit' | 'daily' | 'todo';
   openAddTaskModal: (type: 'habit' | 'daily' | 'todo') => void;
   closeAddTaskModal: () => void;
+  showEditTaskModal: boolean;
+  editTaskModalType: 'habit' | 'daily' | 'todo' | null;
+  editTask: Habit | Daily | Todo | null;
+  openEditTaskModal: (type: 'habit' | 'daily' | 'todo', task: Habit | Daily | Todo) => void;
+  closeEditTaskModal: () => void;
 }
 
 const TasksContext = createContext<TasksContextValue | undefined>(undefined);
@@ -36,6 +41,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [taskModalType, setTaskModalType] = useState<'habit' | 'daily' | 'todo'>('habit');
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editTaskModalType, setEditTaskModalType] = useState<'habit' | 'daily' | 'todo' | null>(null);
+  const [editTask, setEditTask] = useState<Habit | Daily | Todo | null>(null);
 
   // Fetch tasks only if authenticated
   const { data: habits = [], isLoading: habitsLoading } = useQuery<Habit[]>({
@@ -416,6 +424,18 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     await checkTodoMutation.mutateAsync({ id, completed });
   };
 
+  const openEditTaskModal = (type: 'habit' | 'daily' | 'todo', task: Habit | Daily | Todo) => {
+    setEditTaskModalType(type);
+    setEditTask(task);
+    setShowEditTaskModal(true);
+  };
+
+  const closeEditTaskModal = () => {
+    setShowEditTaskModal(false);
+    setEditTaskModalType(null);
+    setEditTask(null);
+  };
+
   return (
     <TasksContext.Provider
       value={{
@@ -439,6 +459,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         taskModalType,
         openAddTaskModal,
         closeAddTaskModal,
+        showEditTaskModal,
+        editTaskModalType,
+        editTask,
+        openEditTaskModal,
+        closeEditTaskModal,
       }}
     >
       {children}

@@ -11,7 +11,7 @@ interface HabitsListProps {
 }
 
 export default function HabitsList({ habits, isLoading }: HabitsListProps) {
-  const { openAddTaskModal, scoreHabit, deleteHabit } = useTasks();
+  const { openAddTaskModal, scoreHabit, deleteHabit, openEditTaskModal } = useTasks();
 
   // Get priority class based on habit priority
   const getPriorityClass = (priority: string) => {
@@ -79,13 +79,18 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                 "task-card bg-white border border-gray-200 rounded-md p-3 transition-all flex items-center justify-between",
                 getPriorityClass(habit.priority)
               )}
+              onClick={() => openEditTaskModal('habit', habit)}
+              style={{ cursor: 'pointer' }}
             >
               <div className="flex items-center">
                 {habit.positive && (
                   <Button
                     size="sm"
                     className="w-8 h-8 p-0 rounded-full bg-green-500 text-white hover:bg-green-600 mr-3 flex items-center justify-center"
-                    onClick={() => scoreHabit(habit.id, 'up')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scoreHabit(habit.id, 'up');
+                    }}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -125,7 +130,10 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                 <Button
                   size="sm"
                   className="w-8 h-8 p-0 rounded-full bg-red-500 text-white hover:bg-red-600 flex items-center justify-center"
-                  onClick={() => scoreHabit(habit.id, 'down')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scoreHabit(habit.id, 'down');
+                  }}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>

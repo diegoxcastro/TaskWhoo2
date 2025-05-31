@@ -34,7 +34,7 @@ function SortableTodo({ todo, children }: { todo: Todo, children: (listeners: an
 }
 
 export default function TodosList({ todos, isLoading, incompleteTodosCount }: TodosListProps) {
-  const { openAddTaskModal, checkTodo, deleteTodo } = useTasks();
+  const { openAddTaskModal, checkTodo, deleteTodo, openEditTaskModal } = useTasks();
   const [activeTab, setActiveTab] = useState("all");
   const [items, setItems] = useState(todos.map(t => t.id));
 
@@ -146,11 +146,15 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
               {filteredTodos.map((todo) => (
                 <SortableTodo key={todo.id} todo={todo}>
                   {(listeners) => (
-                    <div className={cn(
-                      "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
-                      todo.completed ? "bg-yellow-100" : "",
-                      getPriorityClass(todo.priority)
-                    )}>
+                    <div
+                      className={cn(
+                        "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
+                        todo.completed ? "bg-yellow-100" : "",
+                        getPriorityClass(todo.priority)
+                      )}
+                      onClick={() => openEditTaskModal('todo', todo)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <div className="flex items-start">
                         {/* Drag handle */}
                         <button
