@@ -17,11 +17,11 @@ interface TasksContextValue {
   createDaily: (daily: InsertDaily) => Promise<void>;
   updateDaily: (id: number, daily: Partial<InsertDaily>) => Promise<void>;
   deleteDaily: (id: number) => Promise<void>;
-  checkDaily: (id: number, completed: boolean) => Promise<void>;
+  checkDaily: (id: number, completed: boolean) => void;
   createTodo: (todo: InsertTodo) => Promise<void>;
   updateTodo: (id: number, todo: Partial<InsertTodo>) => Promise<void>;
   deleteTodo: (id: number) => Promise<void>;
-  checkTodo: (id: number, completed: boolean) => Promise<void>;
+  checkTodo: (id: number, completed: boolean) => void;
   showAddTaskModal: boolean;
   taskModalType: 'habit' | 'daily' | 'todo';
   openAddTaskModal: (type: 'habit' | 'daily' | 'todo') => void;
@@ -131,26 +131,38 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", `/api/habits/${id}/score/${direction}`);
       return res.json();
     },
-    onSuccess: (data) => {
+    onMutate: async ({ id, direction }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/habits"] });
+      const previousHabits = queryClient.getQueryData<Habit[]>(["/api/habits"]);
+      if (previousHabits) {
+        queryClient.setQueryData<Habit[]>(["/api/habits"],
+          previousHabits.map(habit =>
+            habit.id === id ? { ...habit, ...(direction === 'up' ? { counterUp: habit.counterUp + 1 } : { counterDown: habit.counterDown + 1 }) } : habit
+          )
+        );
+      }
+      return { previousHabits };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousHabits) {
+        queryClient.setQueryData(["/api/habits"], context.previousHabits);
+      }
+      toast({
+        title: "Failed to score habit",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/habits"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
-      
-      const rewardText = data.reward > 0 
-        ? `+${data.reward} XP, +${Math.floor(data.reward / 2)} coins` 
-        : `${data.reward} health`;
-      
+    },
+    onSuccess: (data) => {
       toast({
         title: data.reward > 0 ? "Habit scored!" : "Negative habit",
-        description: `${data.habit.title}: ${rewardText}`,
+        description: `${data.habit.title} completed`,
         variant: data.reward > 0 ? "default" : "destructive",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Failed to score habit",
-        description: error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
       });
     },
   });
@@ -226,20 +238,43 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", `/api/dailies/${id}/check`, { completed });
       return res.json();
     },
-    onSuccess: (data) => {
+    onMutate: async ({ id, completed }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/dailies"] });
+      const previousDailies = queryClient.getQueryData<Daily[]>(["/api/dailies"]);
+      if (previousDailies) {
+        queryClient.setQueryData<Daily[]>(["/api/dailies"],
+          previousDailies.map(daily =>
+            daily.id === id ? { ...daily, completed } : daily
+          )
+        );
+      }
+      return { previousDailies };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousDailies) {
+        queryClient.setQueryData(["/api/dailies"], context.previousDailies);
+      }
+      toast({
+        title: "Failed to check daily",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dailies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
-      
+    },
+    onSuccess: (data) => {
       if (data.reward > 0) {
         toast({
           title: "Daily completed!",
-          description: `${data.daily.title}: +${data.reward} XP, +${Math.floor(data.reward / 2)} coins`,
+          description: `${data.daily.title} completed successfully`,
         });
       } else if (data.reward < 0) {
         toast({
           title: "Daily missed",
-          description: `${data.daily.title}: ${data.reward} health`,
+          description: `${data.daily.title} marked as missed`,
           variant: "destructive",
         });
       } else {
@@ -248,13 +283,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           description: `${data.daily.title} marked as incomplete`,
         });
       }
-    },
-    onError: (error) => {
-      toast({
-        title: "Failed to check daily",
-        description: error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
-      });
     },
   });
 
@@ -325,8 +353,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const checkTodoMutation = useMutation({
     mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+      console.log('checkTodoMutation called with:', { id, completed });
       const res = await apiRequest("POST", `/api/todos/${id}/check`, { completed });
-      return res.json();
+      const result = await res.json();
+      console.log('checkTodoMutation result:', result);
+      return result;
     },
     onMutate: async ({ id, completed }) => {
       await queryClient.cancelQueries({ queryKey: ["/api/todos"] });
@@ -344,6 +375,11 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       if (context?.previousTodos) {
         queryClient.setQueryData(["/api/todos"], context.previousTodos);
       }
+      toast({
+        title: "Failed to check todo",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
@@ -353,8 +389,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     onSuccess: (data) => {
       if (data.reward > 0) {
         toast({
-          title: "Todo completed!",
-          description: `${data.todo.title}: +${data.reward} XP, +${Math.floor(data.reward / 2)} coins`,
+          title: "Todo concluído!",
+          description: `${data.todo.title} foi marcado como concluído.`,
         });
       } else {
         toast({
@@ -404,8 +440,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     await deleteDailyMutation.mutateAsync(id);
   };
 
-  const checkDaily = async (id: number, completed: boolean) => {
-    await checkDailyMutation.mutateAsync({ id, completed });
+  const checkDaily = (id: number, completed: boolean) => {
+    checkDailyMutation.mutate({ id, completed });
   };
 
   const createTodo = async (todo: InsertTodo) => {
@@ -420,8 +456,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     await deleteTodoMutation.mutateAsync(id);
   };
 
-  const checkTodo = async (id: number, completed: boolean) => {
-    await checkTodoMutation.mutateAsync({ id, completed });
+  const checkTodo = (id: number, completed: boolean) => {
+    console.log('checkTodo function called with:', { id, completed });
+    checkTodoMutation.mutate({ id, completed });
   };
 
   const openEditTaskModal = (type: 'habit' | 'daily' | 'todo', task: Habit | Daily | Todo) => {

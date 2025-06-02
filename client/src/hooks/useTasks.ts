@@ -3,6 +3,38 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Habit, Daily, Todo, InsertHabit, InsertDaily, InsertTodo } from "@shared/schema";
 
+// Definindo os tipos que estavam faltando
+type HabitType = Habit;
+type DailyType = Daily;
+type TodoType = Todo;
+
+type ScoreHabitType = {
+  id: number;
+  type: "up" | "down";
+};
+
+type ScoreHabitResponseType = {
+  reward: number;
+};
+
+type CheckDailyType = {
+  id: number;
+  checked: boolean;
+};
+
+type CheckDailyResponseType = {
+  reward: number;
+};
+
+type CheckTodoType = {
+  id: number;
+  checked: boolean;
+};
+
+type CheckTodoResponseType = {
+  reward: number;
+};
+
 export function useTasks() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -105,31 +137,70 @@ export function useTasks() {
   
   // Score habit mutation
   const scoreHabitMutation = useMutation({
-    mutationFn: async ({ id, direction }: { id: number; direction: 'up' | 'down' }) => {
-      const res = await apiRequest("POST", `/api/habits/${id}/score/${direction}`);
-      return res.json();
+    mutationFn: async (data: ScoreHabitType) => {
+      return apiRequest<ScoreHabitResponseType, ScoreHabitType>(
+        `/api/habits/${data.id}/score/${data.type}`,
+        {
+          method: "POST",
+          data: {},
+        },
+      );
+    },
+    onMutate: async (newHabitScoreData: ScoreHabitType) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/habits"] });
+      const previousHabits = queryClient.getQueryData<HabitType[]>(["/api/habits"]);
+      if (previousHabits) {
+        queryClient.setQueryData<HabitType[]>(
+          ["/api/habits"],
+          previousHabits.map(habit =>
+            habit.id === newHabitScoreData.id ? 
+            { 
+              ...habit, 
+              // Simular a atualização do score aqui pode ser complexo 
+              // dependendo da lógica do backend (ex: streak, valor do score).
+              // Para uma UI simples, podemos apenas invalidar ou refetch.
+              // Se a lógica de score for simples (ex: +1/-1), pode ser aplicada aqui.
+              // Por ora, vamos focar na invalidação e deixar o backend cuidar do score.
+              updatedAt: new Date().toISOString() 
+            } : habit
+          )
+        );
+      }
+      return { previousHabits };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/habits"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/habits"] }); // Handled by onSettled
+      // queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
       
       const rewardText = data.reward > 0 
-        ? `+${data.reward} XP, +${Math.floor(data.reward / 2)} moedas` 
-        : `${data.reward} vida`;
-      
-      toast({
-        title: data.reward > 0 ? "Hábito pontuado!" : "Hábito negativo",
-        description: `${data.habit.title}: ${rewardText}`,
-        variant: data.reward > 0 ? "default" : "destructive",
-      });
+        ? `Você ganhou ${data.reward} moedas!` 
+        : (data.reward < 0 ? `Você perdeu ${Math.abs(data.reward)} de vida!` : '');
+
+      if (rewardText) {
+        toast({
+          title: data.type === "up" ? "Hábito positivo pontuado!" : "Hábito negativo pontuado!",
+          description: rewardText,
+          variant: data.reward < 0 ? "destructive" : "default",
+        });
+      } else {
+        toast({
+          title: "Hábito pontuado!",
+        });
+      }
     },
-    onError: (error) => {
+    onError: (error: any, newHabitScoreData, context) => {
       toast({
         title: "Erro ao pontuar hábito",
-        description: error instanceof Error ? error.message : "Por favor, tente novamente",
+        description: error.message || "Ocorreu um erro",
         variant: "destructive",
       });
+      if (context?.previousHabits) {
+        queryClient.setQueryData<HabitType[]>(["/api/habits"], context.previousHabits);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habits"] });
     },
   });
   
@@ -201,39 +272,56 @@ export function useTasks() {
   
   // Check daily mutation
   const checkDailyMutation = useMutation({
-    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
-      const res = await apiRequest("POST", `/api/dailies/${id}/check`, { completed });
-      return res.json();
+    mutationFn: async (data: CheckDailyType) => {
+      return apiRequest<CheckDailyResponseType, CheckDailyType>(
+        `/api/dailies/${data.id}/check`,
+        {
+          method: "POST",
+          data: { completed: data.checked },
+        },
+      );
+    },
+    onMutate: async (newDailyData: CheckDailyType) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/dailies"] });
+      const previousDailies = queryClient.getQueryData<DailyType[]>(["/api/dailies"]);
+      if (previousDailies) {
+        queryClient.setQueryData<DailyType[]>(
+          ["/api/dailies"],
+          previousDailies.map(daily =>
+            daily.id === newDailyData.id ? { ...daily, completed: newDailyData.checked, updatedAt: new Date().toISOString() } : daily
+          )
+        );
+      }
+      return { previousDailies };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dailies"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/dailies"] }); // Handled by onSettled
+      // queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
       
       if (data.reward > 0) {
         toast({
-          title: "Diária completada!",
-          description: `${data.daily.title}: +${data.reward} XP, +${Math.floor(data.reward / 2)} moedas`,
-        });
-      } else if (data.reward < 0) {
-        toast({
-          title: "Diária perdida",
-          description: `${data.daily.title}: ${data.reward} vida`,
-          variant: "destructive",
+          title: "Tarefa diária concluída!",
+          description: `Você ganhou ${data.reward} moedas!`,
         });
       } else {
         toast({
-          title: "Diária desmarcada",
-          description: `${data.daily.title} marcada como incompleta`,
+          title: "Tarefa diária atualizada!",
         });
       }
     },
-    onError: (error) => {
+    onError: (error: any, newDailyData, context) => {
       toast({
-        title: "Erro ao marcar diária",
-        description: error instanceof Error ? error.message : "Por favor, tente novamente",
+        title: "Erro ao concluir tarefa diária",
+        description: error.message || "Ocorreu um erro",
         variant: "destructive",
       });
+      if (context?.previousDailies) {
+        queryClient.setQueryData<DailyType[]>(["/api/dailies"], context.previousDailies);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dailies"] });
     },
   });
   
@@ -305,33 +393,64 @@ export function useTasks() {
   
   // Check todo mutation
   const checkTodoMutation = useMutation({
-    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
-      const res = await apiRequest("POST", `/api/todos/${id}/check`, { completed });
-      return res.json();
+    mutationFn: async (data: CheckTodoType) => {
+      return apiRequest<CheckTodoResponseType, CheckTodoType>(
+        `/api/todos/${data.id}/check`,
+        {
+          method: "POST",
+          data: { completed: data.checked },
+        },
+      );
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
+    onMutate: async (newTodoData: CheckTodoType) => {
+      // Cancelar queries pendentes para evitar sobrescrever a atualização otimista
+      await queryClient.cancelQueries({ queryKey: ["/api/todos"] });
+
+      // Salvar o estado anterior
+      const previousTodos = queryClient.getQueryData<TodoType[]>(["/api/todos"]);
+
+      // Atualizar otimisticamente para o novo valor
+      if (previousTodos) {
+        queryClient.setQueryData<TodoType[]>(
+          ["/api/todos"],
+          previousTodos.map(todo =>
+            todo.id === newTodoData.id ? { ...todo, completed: newTodoData.checked, updatedAt: new Date().toISOString() } : todo
+          )
+        );
+      }
+
+      // Retornar o contexto com o estado anterior
+      return { previousTodos };
+    },
+    onSuccess: (data, variables, context) => {
+      // A invalidação de ["/api/todos"] agora é tratada por onSettled.
+      // As invalidações de usuário/autenticação já estão comentadas da etapa anterior.
       
       if (data.reward > 0) {
         toast({
-          title: "Afazer completado!",
-          description: `${data.todo.title}: +${data.reward} XP, +${Math.floor(data.reward / 2)} moedas`,
+          title: "Tarefa concluída!",
+          description: `Você ganhou ${data.reward} moedas!`,
         });
       } else {
         toast({
-          title: "Afazer desmarcado",
-          description: `${data.todo.title} marcado como incompleto`,
+          title: "Tarefa atualizada!",
         });
       }
     },
-    onError: (error) => {
+    onError: (error: any, newTodoData, context) => {
       toast({
-        title: "Erro ao marcar afazer",
-        description: error instanceof Error ? error.message : "Por favor, tente novamente",
+        title: "Erro ao concluir tarefa",
+        description: error.message || "Ocorreu um erro",
         variant: "destructive",
       });
+      // Reverter para o estado anterior em caso de erro
+      if (context?.previousTodos) {
+        queryClient.setQueryData<TodoType[]>(["/api/todos"], context.previousTodos);
+      }
+    },
+    onSettled: (data, error, variables, context) => {
+      // Invalidar a query de todos para garantir consistência com o servidor
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
     },
   });
   

@@ -174,6 +174,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                               checkTodo(todo.id, checked);
                             }
                           }}
+                          onClick={(e) => e.stopPropagation()}
                           className={cn(
                             "mt-1 mr-3 h-5 w-5 rounded-full border-2",
                             todo.completed 

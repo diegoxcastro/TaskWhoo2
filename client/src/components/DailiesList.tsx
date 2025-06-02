@@ -203,6 +203,7 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                               checkDaily(daily.id, checked);
                             }
                           }}
+                          onClick={(e) => e.stopPropagation()}
                           className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
                         />
                         <div className="flex-grow">

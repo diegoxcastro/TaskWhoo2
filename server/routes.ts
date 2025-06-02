@@ -178,11 +178,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: 1,
           username: "dev-user",
           password: "dev-password",
-          level: 1,
-          experience: 0,
-          health: 50,
-          maxHealth: 50,
-          coins: 0,
           avatar: null,
           auth_id: null,
           createdAt: new Date()
@@ -234,12 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create admin user
       const userData = {
         username: "admin",
-        password: "admin123",
-        level: 1,
-        experience: 0,
-        health: 50,
-        maxHealth: 50,
-        coins: 0
+        password: "admin123"
       };
       
       const user = await storage.createUser(userData);

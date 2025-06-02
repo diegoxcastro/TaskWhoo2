@@ -8,6 +8,8 @@ import type { Database } from '@shared/schema';
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("USE_MEMORY_STORAGE:", process.env.USE_MEMORY_STORAGE);
 console.log("DATABASE_URL exists:", !!process.env.DATABASE_URL);
+console.log("DB_HOST:", process.env.DB_HOST);
+console.log("DB_DATABASE:", process.env.DB_DATABASE);
 
 // URL padrão para modo development - impede erros quando não há variáveis de ambiente
 const FALLBACK_URL = "http://localhost:8000";
@@ -36,10 +38,14 @@ if (!useMemoryStorage) {
     // Configura o pool de conexões
     pool = new Pool({ 
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: false, // Desabilitar SSL para conexões locais do Docker
       connectionTimeoutMillis: 30000, // 30 segundos de timeout
       max: 10, // máximo de conexões no pool
-      idleTimeoutMillis: 60000 // quanto tempo uma conexão pode ficar ociosa
+      idleTimeoutMillis: 60000, // quanto tempo uma conexão pode ficar ociosa
+      acquireTimeoutMillis: 30000, // timeout para adquirir conexão do pool
+      createTimeoutMillis: 30000, // timeout para criar nova conexão
+      reapIntervalMillis: 1000, // intervalo para verificar conexões ociosas
+      createRetryIntervalMillis: 200 // intervalo entre tentativas de reconexão
     });
     
     // Criar instância do Drizzle usando o pool de conexões

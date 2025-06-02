@@ -38,28 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  // Check if user is already authenticated
-  const { data, isLoading } = useQuery({
-    queryKey: ["/api/auth/check"],
-    retry: 1, // Retry once in case of network issues
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    onSuccess: (data) => {
-      if (data) {
-        setUser(data);
-      } else if (!user) {
-        // Only clear user if we don't have one stored locally
-        setUser(null);
-      }
-    },
-    onError: (error) => {
-      console.warn('Auth check failed:', error);
-      // Don't immediately clear user on error - keep localStorage user if available
-      // Only clear if we're sure the user is not authenticated
-      if (!user) {
-        setUser(null);
-      }
-    }
-  });
+  // Disable automatic auth check to prevent 401 errors and page reloads
+  // Authentication will be handled through login/register mutations only
+  const isLoading = false;
 
   // Login mutation
   const loginMutation = useMutation({

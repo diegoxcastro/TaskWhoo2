@@ -26,7 +26,7 @@ export interface IStorage {
   createHabit(userId: number, habit: InsertHabit): Promise<Habit>;
   updateHabit(id: number, habitData: Partial<Habit>): Promise<Habit | undefined>;
   deleteHabit(id: number): Promise<boolean>;
-  scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit, reward: number }>;
+  scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }>;
   
   // Daily methods
   getDailies(userId: number): Promise<Daily[]>;
@@ -330,68 +330,44 @@ export class SupabaseStorage implements IStorage {
     return !!deleted;
   }
 
-  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit, reward: number }> {
-    // Get the habit first
-    const habit = await this.getHabit(id);
-    if (!habit) throw new Error("Habit not found");
+  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }> {
+    const habit = await this.getHabitById(id);
+    if (!habit) {
+      throw new Error('Habit not found');
+    }
 
-    // Calculate reward based on priority
-    let reward = 0;
-    if (direction === 'up' && habit.positive) {
-      reward = this.calculateReward(habit.priority);
+    // Update counters
+    if (direction === 'up') {
       await db
         .update(taskVida)
-        .set({ 
-          counterUp: (habit.counterUp || 0) + 1,
-          strength: (habit.strength || 0) + 1,
-          updatedAt: new Date()
+        .set({
+          counterUp: habit.counterUp + 1
         })
         .where(eq(taskVida.id, id));
-    } else if (direction === 'down' && habit.negative) {
-      reward = -this.calculateReward(habit.priority);
+    } else {
       await db
         .update(taskVida)
-        .set({ 
-          counterDown: (habit.counterDown || 0) + 1,
-          strength: (habit.strength || 0) - 1,
-          updatedAt: new Date()
+        .set({
+          counterDown: habit.counterDown + 1
         })
         .where(eq(taskVida.id, id));
     }
 
-    // Get the updated habit
-    const updatedHabit = await this.getHabit(id);
-    if (!updatedHabit) throw new Error("Failed to update habit");
-    
-    // Update user's XP and coins if there's a reward
-    if (reward !== 0) {
-      const user = await this.getUser(habit.userId);
-      if (user) {
-        // Add XP and coins for positive actions
-        if (reward > 0) {
-          await this.updateUser(user.id, {
-            experience: user.experience + reward,
-            coins: user.coins + Math.floor(reward / 2)
-          });
-        } 
-        // Subtract health for negative actions
-        else {
-          const newHealth = Math.max(0, user.health + reward);
-          await this.updateUser(user.id, { health: newHealth });
-        }
-        
-        // Log the activity
-        await this.createActivityLog({
-          userId: user.id,
-          taskType: 'habit',
-          taskId: habit.id,
-          action: direction === 'up' ? 'scored_up' : 'scored_down',
-          value: reward
-        });
-      }
-    }
+    // Calculate reward (but don't apply to user)
+    const baseReward = this.getRewardForPriority(habit.priority);
+    const reward = direction === 'up' ? baseReward : -baseReward;
 
-    return { habit: updatedHabit, reward };
+    // Log the activity
+    await this.logActivity({
+      userId: habit.userId,
+      taskId: habit.id,
+      taskType: 'habit',
+      action: direction === 'up' ? 'scored_up' : 'scored_down',
+      value: reward
+    });
+
+    const updatedHabit = await this.getHabitById(id);
+    return { habit: updatedHabit!, reward };
   }
 
   // Daily methods
@@ -578,7 +554,6 @@ export class SupabaseStorage implements IStorage {
     
     // If marking as completed
     if (completed && !daily.completed) {
-      reward = this.calculateReward(daily.priority);
       updatedStreak += 1;
       
       // Update the daily
@@ -592,27 +567,17 @@ export class SupabaseStorage implements IStorage {
         })
         .where(eq(taskVida.id, id));
       
-      // Update user stats
-      const user = await this.getUser(daily.userId);
-      if (user) {
-        await this.updateUser(user.id, {
-          experience: user.experience + reward,
-          coins: user.coins + Math.floor(reward / 2)
-        });
-        
-        // Log activity
-        await this.createActivityLog({
-          userId: user.id,
-          taskType: 'daily',
-          taskId: daily.id,
-          action: 'completed',
-          value: reward
-        });
-      }
+      // Log activity
+      await this.createActivityLog({
+        userId: daily.userId,
+        taskType: 'daily',
+        taskId: daily.id,
+        action: 'completed',
+        value: 0
+      });
     } 
     // If marking as uncompleted
     else if (!completed && daily.completed) {
-      reward = -this.calculateReward(daily.priority);
       updatedStreak = Math.max(0, daily.streak - 1);
       
       // Update the daily
@@ -625,21 +590,14 @@ export class SupabaseStorage implements IStorage {
         })
         .where(eq(taskVida.id, id));
       
-      // Update user stats (health penalty)
-      const user = await this.getUser(daily.userId);
-      if (user) {
-        const newHealth = Math.max(0, user.health + reward);
-        await this.updateUser(user.id, { health: newHealth });
-        
-        // Log activity
-        await this.createActivityLog({
-          userId: user.id,
-          taskType: 'daily',
-          taskId: daily.id,
-          action: 'uncompleted',
-          value: reward
-        });
-      }
+      // Log activity
+      await this.createActivityLog({
+        userId: daily.userId,
+        taskType: 'daily',
+        taskId: daily.id,
+        action: 'uncompleted',
+        value: 0
+      });
     }
     
     // Get updated daily
@@ -650,51 +608,29 @@ export class SupabaseStorage implements IStorage {
   }
 
   async resetDailies(): Promise<void> {
-    // Get all dailies
-    const allDailies = await db
-      .select()
-      .from(taskVida)
-      .where(eq(taskVida.type, 'daily'));
-    
-    const now = new Date();
-    const today = now.getDay(); // 0-6, Sunday is 0
-    
-    for (const daily of allDailies) {
-      // Skip if this daily is not active today
-      if (daily.repeat && !daily.repeat[today]) {
-        continue;
-      }
-      
-      // Skip if not completed and should be penalized
-      if (!daily.completed) {
-        // Calculate penalty based on priority
-        const penalty = this.calculatePenalty(daily.priority);
-        
-        // Update user's health
-        const user = await this.getUser(daily.userId);
-        if (user) {
-          const newHealth = Math.max(0, user.health - penalty);
-          await this.updateUser(user.id, { health: newHealth });
-          
-          // Log activity
-          await this.createActivityLog({
-            userId: user.id,
-            taskType: 'daily',
-            taskId: daily.id,
-            action: 'missed',
-            value: -penalty
-          });
-        }
-      }
-      
-      // Reset the daily's completed status
+    // This would be run daily at midnight to reset all dailies
+    try {
+      // Reset all dailies to uncompleted in the database
       await db
         .update(taskVida)
         .set({ 
           completed: false,
-          updatedAt: now
+          updatedAt: new Date()
         })
-        .where(eq(taskVida.id, daily.id));
+        .where(eq(taskVida.type, 'daily'));
+    } catch (error) {
+      console.error('Error resetting dailies:', error);
+      // Fallback to memory storage if database fails
+      if (useMemoryStorage) {
+        const allUsers = Array.from(this.users.values());
+        
+        for (const user of allUsers) {
+          // Reset all dailies to uncompleted
+          for (const daily of Array.from(this.dailies.values()).filter(d => d.userId === user.id)) {
+            this.dailies.set(daily.id, { ...daily, completed: false });
+          }
+        }
+      }
     }
   }
 
@@ -854,42 +790,65 @@ export class SupabaseStorage implements IStorage {
     // If marking as completed
     if (completed && !todo.completed) {
       reward = this.calculateReward(todo.priority);
-      const updatedTodo = { ...todo, completed: true, completedAt: now };
-      this.todos.set(id, updatedTodo);
-      // Update user stats
-      const user = await this.getUser(todo.userId);
-      if (user) {
-        this.updateUser(user.id, {
-          experience: user.experience + reward,
-          coins: user.coins + Math.floor(reward / 2)
-        });
-        // Log activity
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'todo',
-          taskId: todo.id,
-          action: 'completed',
-          value: reward
-        });
-      }
+      
+      // Update in TaskVida
+      const [task] = await db.update(taskVida)
+        .set({
+          completed: true,
+          completedAt: now,
+          updatedAt: now
+        })
+        .where(and(
+          eq(taskVida.id, id),
+          eq(taskVida.type, 'todo')
+        ))
+        .returning();
+      
+      // Convert TaskVida to Todo
+      const updatedTodo = this.convertTaskVidaToTodo(task);
+      
+      // Log activity
+      await this.createActivityLog({
+        userId: todo.userId,
+        taskType: 'todo',
+        taskId: todo.id,
+        action: 'completed',
+        value: reward
+      });
+      
+      return { todo: updatedTodo, reward };
     } 
     // If marking as uncompleted
     else if (!completed && todo.completed) {
-      const updatedTodo = { ...todo, completed: false, completedAt: null };
-      this.todos.set(id, updatedTodo);
+      // Update in TaskVida
+      const [task] = await db.update(taskVida)
+        .set({
+          completed: false,
+          completedAt: null,
+          updatedAt: now
+        })
+        .where(and(
+          eq(taskVida.id, id),
+          eq(taskVida.type, 'todo')
+        ))
+        .returning();
+      
+      // Convert TaskVida to Todo
+      const updatedTodo = this.convertTaskVidaToTodo(task);
+      
       // Log activity
-      const user = await this.getUser(todo.userId);
-      if (user) {
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'todo',
-          taskId: todo.id,
-          action: 'uncompleted',
-          value: 0
-        });
-      }
+      await this.createActivityLog({
+        userId: todo.userId,
+        taskType: 'todo',
+        taskId: todo.id,
+        action: 'uncompleted',
+        value: 0
+      });
+      
+      return { todo: updatedTodo, reward: 0 };
     }
-    return { todo: this.todos.get(id)!, reward };
+    
+    return { todo, reward };
   }
 
   // Activity log methods
@@ -911,574 +870,239 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Helper methods
-  private calculateReward(priority: string): number {
-    switch (priority) {
-      case 'trivial': return 1;
-      case 'easy': return 2;
-      case 'medium': return 5;
-      case 'hard': return 10;
-      default: return 1;
-    }
-  }
-
-  private calculatePenalty(priority: string): number {
-    switch (priority) {
-      case 'trivial': return 1;
-      case 'easy': return 2;
-      case 'medium': return 5;
-      case 'hard': return 10;
-      default: return 1;
-    }
+  private convertTaskVidaToTodo(task: any): Todo {
+    return {
+      id: task.id,
+      userId: task.userId,
+      title: task.title,
+      notes: task.notes || null,
+      priority: task.priority,
+      completed: task.completed || false,
+      dueDate: task.dueDate || null,
+      createdAt: task.createdAt,
+      completedAt: task.completedAt || null,
+      order: typeof task.order === 'number' ? task.order : 0
+    };
   }
 }
 
 // Create an instance of MemStorage as a fallback if database isn't connected
 export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private habits: Map<number, Habit>;
-  private dailies: Map<number, Daily>;
-  private todos: Map<number, Todo>;
-  private activityLogs: Map<number, ActivityLog>;
-  
-  private userId: number = 1;
-  private habitId: number = 1;
-  private dailyId: number = 1;
-  private todoId: number = 1;
-  private logId: number = 1;
-
-  constructor() {
-    this.users = new Map();
-    this.habits = new Map();
-    this.dailies = new Map();
-    this.todos = new Map();
-    this.activityLogs = new Map();
-    
-    // Create a default user for testing
-    this.createUser({
-      username: "demo",
-      password: "password",
-      level: 1,
-      experience: 0,
-      health: 50,
-      maxHealth: 50,
-      coins: 0,
-      avatar: undefined
-    });
-  }
+  private users: User[] = [];
+  private habits: Habit[] = [];
+  private dailies: Daily[] = [];
+  private todos: Todo[] = [];
+  private activityLogs: ActivityLog[] = [];
+  private nextId = 1;
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    return this.users.find(user => user.id === id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    return this.users.find(user => user.username === username);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    // Verifica se já existe usuário com o mesmo username
-    const existing = Array.from(this.users.values()).find(u => u.username === insertUser.username);
-    if (existing) return existing;
-    const id = this.userId++;
-    const now = new Date();
-    const user: User = {
-      ...insertUser,
-      id,
-      createdAt: now,
-      avatar: insertUser.avatar ?? null,
-      auth_id: insertUser.auth_id ?? null
+  async createUser(user: InsertUser): Promise<User> {
+    const newUser: User = {
+      ...user,
+      id: this.nextId++,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.users.set(id, user);
-    return user;
+    this.users.push(newUser);
+    return newUser;
   }
 
   async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
+    const userIndex = this.users.findIndex(user => user.id === id);
+    if (userIndex === -1) return undefined;
     
-    const updatedUser = { ...user, ...userData };
-    this.users.set(id, updatedUser);
-    return updatedUser;
+    this.users[userIndex] = {
+      ...this.users[userIndex],
+      ...userData,
+      updatedAt: new Date()
+    };
+    return this.users[userIndex];
   }
-
+  
   // Habit methods
   async getHabits(userId: number): Promise<Habit[]> {
-    return Array.from(this.habits.values()).filter(
-      (habit) => habit.userId === userId
-    ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return this.habits.filter(habit => habit.userId === userId);
   }
 
   async getHabit(id: number): Promise<Habit | undefined> {
-    return this.habits.get(id);
+    return this.habits.find(habit => habit.id === id);
   }
 
-  async createHabit(userId: number, habitData: InsertHabit): Promise<Habit> {
-    const id = this.habitId++;
-    const now = new Date();
-    const habit: Habit = { 
-      ...habitData, 
-      id, 
-      userId, 
-      strength: 0,
-      counterUp: 0,
-      counterDown: 0,
-      createdAt: now 
+  async createHabit(userId: number, habit: InsertHabit): Promise<Habit> {
+    const newHabit: Habit = {
+      ...habit,
+      id: this.nextId++,
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.habits.set(id, habit);
-    return habit;
+    this.habits.push(newHabit);
+    return newHabit;
   }
 
   async updateHabit(id: number, habitData: Partial<Habit>): Promise<Habit | undefined> {
-    const habit = this.habits.get(id);
-    if (!habit) return undefined;
+    const habitIndex = this.habits.findIndex(habit => habit.id === id);
+    if (habitIndex === -1) return undefined;
     
-    const updatedHabit = { ...habit, ...habitData };
-    this.habits.set(id, updatedHabit);
-    return updatedHabit;
+    this.habits[habitIndex] = {
+      ...this.habits[habitIndex],
+      ...habitData,
+      updatedAt: new Date()
+    };
+    return this.habits[habitIndex];
   }
 
   async deleteHabit(id: number): Promise<boolean> {
-    return this.habits.delete(id);
-  }
-
-  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit, reward: number }> {
-    const habit = this.habits.get(id);
-    if (!habit) throw new Error("Habit not found");
-
-    let reward = 0;
-    if (direction === 'up' && habit.positive) {
-      reward = this.calculateReward(habit.priority);
-      const updatedHabit = { 
-        ...habit, 
-        counterUp: habit.counterUp + 1,
-        strength: habit.strength + 1
-      };
-      this.habits.set(id, updatedHabit);
-    } else if (direction === 'down' && habit.negative) {
-      reward = -this.calculateReward(habit.priority);
-      const updatedHabit = { 
-        ...habit, 
-        counterDown: habit.counterDown + 1,
-        strength: habit.strength - 1
-      };
-      this.habits.set(id, updatedHabit);
-    }
-
-    const updatedHabit = this.habits.get(id)!;
+    const habitIndex = this.habits.findIndex(habit => habit.id === id);
+    if (habitIndex === -1) return false;
     
-    // Update user's XP and coins if there's a reward
-    if (reward !== 0) {
-      const user = this.users.get(habit.userId);
-      if (user) {
-        // Add XP and coins for positive actions
-        if (reward > 0) {
-          this.updateUser(user.id, {
-            experience: user.experience + reward,
-            coins: user.coins + Math.floor(reward / 2)
-          });
-        } 
-        // Subtract health for negative actions
-        else {
-          const newHealth = Math.max(0, user.health + reward);
-          this.updateUser(user.id, { health: newHealth });
-        }
-        
-        // Log the activity
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'habit',
-          taskId: habit.id,
-          action: direction === 'up' ? 'scored_up' : 'scored_down',
-          value: reward
-        });
-      }
-    }
-
-    return { habit: updatedHabit, reward };
+    this.habits.splice(habitIndex, 1);
+    return true;
   }
 
+  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }> {
+    const habit = await this.getHabit(id);
+    if (!habit) throw new Error('Habit not found');
+    
+    const updatedHabit = await this.updateHabit(id, {
+      value: habit.value + (direction === 'up' ? 1 : -1)
+    });
+    
+    return { habit: updatedHabit!, reward: 0 };
+  }
+  
   // Daily methods
   async getDailies(userId: number): Promise<Daily[]> {
-    return Array.from(this.dailies.values()).filter(
-      (daily) => daily.userId === userId
-    ).sort((a, b) => {
-      const aTime = a.createdAt ? a.createdAt.getTime() : 0;
-      const bTime = b.createdAt ? b.createdAt.getTime() : 0;
-      return aTime - bTime;
-    });
+    return this.dailies.filter(daily => daily.userId === userId);
   }
 
   async getDaily(id: number): Promise<Daily | undefined> {
-    return this.dailies.get(id);
+    return this.dailies.find(daily => daily.id === id);
   }
 
-  async createDaily(userId: number, dailyData: InsertDaily): Promise<Daily> {
-    const id = this.dailyId++;
-    const now = new Date();
-    const repeatArray: boolean[] = Array.isArray(dailyData.repeat) ? dailyData.repeat : [true, true, true, true, true, true, true];
-    const daily: Daily = {
-      id,
+  async createDaily(userId: number, daily: InsertDaily): Promise<Daily> {
+    const newDaily: Daily = {
+      ...daily,
+      id: this.nextId++,
       userId,
-      title: dailyData.title,
-      notes: dailyData.notes ?? null,
-      priority: dailyData.priority ?? 'easy',
       completed: false,
-      streak: 0,
-      repeat: repeatArray,
-      icon: dailyData.icon ?? "CheckCircle",
-      createdAt: now,
-      lastCompleted: null
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.dailies.set(id, daily);
-    return daily;
+    this.dailies.push(newDaily);
+    return newDaily;
   }
 
   async updateDaily(id: number, dailyData: Partial<Daily>): Promise<Daily | undefined> {
-    if (useMemoryStorage) {
-      return this.memStorage.updateDaily(id, dailyData);
-    }
+    const dailyIndex = this.dailies.findIndex(daily => daily.id === id);
+    if (dailyIndex === -1) return undefined;
     
-    try {
-      // Preparar os dados para atualização
-      const updateData: any = {};
-      
-      if (dailyData.title !== undefined) updateData.title = dailyData.title;
-      if (dailyData.notes !== undefined) updateData.notes = dailyData.notes;
-      if (dailyData.priority !== undefined) updateData.priority = dailyData.priority;
-      if (dailyData.completed !== undefined) updateData.completed = dailyData.completed;
-      if (dailyData.streak !== undefined) updateData.streak = dailyData.streak;
-      
-      // Sempre atualizar a data de atualização
-      updateData.updatedAt = new Date();
-      
-      // Construir a query
-      const query = db.update(taskVida);
-      
-      // Adicionar todos os campos simples
-      query.set(updateData);
-      
-      // Tratar o campo repeat separadamente se existir
-      if (dailyData.repeat) {
-        const repeatArray = dailyData.repeat;
-        // Adicionar o campo repeat com formato adequado para o PostgreSQL
-        query.set({
-          repeat: db.sql`array[${db.sql.join(repeatArray.map(v => db.sql`${v}`), db.sql`, `)}]::boolean[]`
-        });
-      }
-      
-      // Executar a query
-      const [task] = await query
-        .where(and(
-          eq(taskVida.id, id),
-          eq(taskVida.type, 'daily')
-        ))
-        .returning();
-      
-      if (!task) return undefined;
-      
-      // Convert TaskVida to Daily
-      return {
-        id: task.id,
-        userId: task.userId,
-        title: task.title,
-        notes: task.notes || null,
-        priority: task.priority,
-        completed: task.completed || false,
-        streak: task.streak || 0,
-        repeat: task.repeat || [true, true, true, true, true, true, true],
-        icon: "CheckCircle",
-        createdAt: task.createdAt,
-        lastCompleted: task.lastCompleted || null,
-        order: typeof task.order === 'number' ? task.order : 0
-      };
-    } catch (error) {
-      console.error("Erro ao atualizar daily:", error);
-      return this.memStorage.updateDaily(id, dailyData);
-    }
+    this.dailies[dailyIndex] = {
+      ...this.dailies[dailyIndex],
+      ...dailyData,
+      updatedAt: new Date()
+    };
+    return this.dailies[dailyIndex];
   }
 
   async deleteDaily(id: number): Promise<boolean> {
-    return this.dailies.delete(id);
+    const dailyIndex = this.dailies.findIndex(daily => daily.id === id);
+    if (dailyIndex === -1) return false;
+    
+    this.dailies.splice(dailyIndex, 1);
+    return true;
   }
 
   async checkDaily(id: number, completed: boolean): Promise<{ daily: Daily, reward: number }> {
-    const daily = this.dailies.get(id);
-    if (!daily) throw new Error("Daily not found");
-
-    let reward = 0;
-    let updatedStreak = daily.streak;
-    const now = new Date();
+    const daily = await this.updateDaily(id, { completed });
+    if (!daily) throw new Error('Daily not found');
     
-    // If marking as completed
-    if (completed && !daily.completed) {
-      reward = this.calculateReward(daily.priority);
-      updatedStreak += 1;
-      
-      const updatedDaily = { 
-        ...daily, 
-        completed: true, 
-        streak: updatedStreak,
-        lastCompleted: now
-      };
-      this.dailies.set(id, updatedDaily);
-      
-      // Update user stats
-      const user = this.users.get(daily.userId);
-      if (user) {
-        this.updateUser(user.id, {
-          experience: user.experience + reward,
-          coins: user.coins + Math.floor(reward / 2)
-        });
-        
-        // Log activity
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'daily',
-          taskId: daily.id,
-          action: 'completed',
-          value: reward
-        });
-      }
-    } 
-    // If marking as uncompleted
-    else if (!completed && daily.completed) {
-      reward = -this.calculateReward(daily.priority);
-      updatedStreak = Math.max(0, updatedStreak - 1);
-      
-      const updatedDaily = { 
-        ...daily, 
-        completed: false, 
-        streak: updatedStreak,
-        lastCompleted: undefined
-      };
-      this.dailies.set(id, updatedDaily);
-      
-      // Update user stats - don't penalize for unchecking
-      const user = this.users.get(daily.userId);
-      if (user) {
-        // Log activity
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'daily',
-          taskId: daily.id,
-          action: 'uncompleted',
-          value: 0
-        });
-      }
-    }
-
-    return { daily: this.dailies.get(id)!, reward };
+    return { daily, reward: 0 };
   }
 
   async resetDailies(): Promise<void> {
-    // This would be run daily at midnight to reset all dailies
-    const allUsers = Array.from(this.users.values());
-    
-    for (const user of allUsers) {
-      // Get all uncompleted dailies for penalties
-      const uncompletedDailies = Array.from(this.dailies.values()).filter(
-        daily => daily.userId === user.id && !daily.completed
-      );
-      
-      // Apply penalties for uncompleted dailies
-      let totalPenalty = 0;
-      for (const daily of uncompletedDailies) {
-        // Check if today is in the daily's repeat schedule
-        const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-        if (daily.repeat[today]) {
-          const penalty = this.calculatePenalty(daily.priority);
-          totalPenalty += penalty;
-          
-          // Log the missed daily
-          this.createActivityLog({
-            userId: user.id,
-            taskType: 'daily',
-            taskId: daily.id,
-            action: 'missed',
-            value: penalty
-          });
-        }
-      }
-      
-      // Apply the penalty to the user's health
-      if (totalPenalty < 0) {
-        const newHealth = Math.max(0, user.health + totalPenalty);
-        this.updateUser(user.id, { health: newHealth });
-      }
-      
-      // Reset all dailies to uncompleted
-      for (const daily of Array.from(this.dailies.values()).filter(d => d.userId === user.id)) {
-        this.dailies.set(daily.id, { ...daily, completed: false });
-      }
+    for (const daily of this.dailies) {
+      daily.completed = false;
+      daily.updatedAt = new Date();
     }
   }
-
+  
   // Todo methods
   async getTodos(userId: number): Promise<Todo[]> {
-    return Array.from(this.todos.values()).filter(
-      (todo) => todo.userId === userId
-    ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return this.todos.filter(todo => todo.userId === userId);
   }
 
   async getTodo(id: number): Promise<Todo | undefined> {
-    return this.todos.get(id);
+    return this.todos.find(todo => todo.id === id);
   }
 
-  async createTodo(userId: number, todoData: InsertTodo): Promise<Todo> {
-    const id = this.todoId++;
-    const now = new Date();
-    const todo: Todo = { 
-      ...todoData, 
-      id, 
-      userId, 
+  async createTodo(userId: number, todo: InsertTodo): Promise<Todo> {
+    const newTodo: Todo = {
+      ...todo,
+      id: this.nextId++,
+      userId,
       completed: false,
-      createdAt: now,
-      completedAt: undefined
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
-    this.todos.set(id, todo);
-    return todo;
+    this.todos.push(newTodo);
+    return newTodo;
   }
 
   async updateTodo(id: number, todoData: Partial<Todo>): Promise<Todo | undefined> {
-    if (useMemoryStorage) {
-      return this.memStorage.updateTodo(id, todoData);
-    }
+    const todoIndex = this.todos.findIndex(todo => todo.id === id);
+    if (todoIndex === -1) return undefined;
     
-    try {
-      // Update in TaskVida
-      const [task] = await db.update(taskVida)
-        .set({
-          title: todoData.title,
-          notes: todoData.notes,
-          priority: todoData.priority,
-          completed: todoData.completed,
-          dueDate: todoData.dueDate,
-          completedAt: todoData.completedAt,
-          updatedAt: new Date()
-        })
-        .where(and(
-          eq(taskVida.id, id),
-          eq(taskVida.type, 'todo')
-        ))
-        .returning();
-      
-      if (!task) return undefined;
-      
-      // Convert TaskVida to Todo
-      return {
-        id: task.id,
-        userId: task.userId,
-        title: task.title,
-        notes: task.notes || null,
-        priority: task.priority,
-        completed: task.completed || false,
-        dueDate: task.dueDate || null,
-        createdAt: task.createdAt,
-        completedAt: task.completedAt || null,
-        order: typeof task.order === 'number' ? task.order : 0
-      };
-    } catch (error) {
-      console.error("Erro ao atualizar todo:", error);
-      return this.memStorage.updateTodo(id, todoData);
-    }
+    this.todos[todoIndex] = {
+      ...this.todos[todoIndex],
+      ...todoData,
+      updatedAt: new Date()
+    };
+    return this.todos[todoIndex];
   }
 
   async deleteTodo(id: number): Promise<boolean> {
-    return this.todos.delete(id);
+    const todoIndex = this.todos.findIndex(todo => todo.id === id);
+    if (todoIndex === -1) return false;
+    
+    this.todos.splice(todoIndex, 1);
+    return true;
   }
 
   async checkTodo(id: number, completed: boolean): Promise<{ todo: Todo, reward: number }> {
-    const todo = this.todos.get(id);
-    if (!todo) throw new Error("Todo not found");
-
-    let reward = 0;
-    const now = new Date();
-    // If marking as completed
-    if (completed && !todo.completed) {
-      reward = this.calculateReward(todo.priority);
-      const updatedTodo = { ...todo, completed: true, completedAt: now };
-      this.todos.set(id, updatedTodo);
-      // Update user stats
-      const user = this.users.get(todo.userId);
-      if (user) {
-        this.updateUser(user.id, {
-          experience: user.experience + reward,
-          coins: user.coins + Math.floor(reward / 2)
-        });
-        // Log activity
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'todo',
-          taskId: todo.id,
-          action: 'completed',
-          value: reward
-        });
-      }
-    } 
-    // If marking as uncompleted
-    else if (!completed && todo.completed) {
-      const updatedTodo = { ...todo, completed: false, completedAt: null };
-      this.todos.set(id, updatedTodo);
-      // Log activity
-      const user = this.users.get(todo.userId);
-      if (user) {
-        this.createActivityLog({
-          userId: user.id,
-          taskType: 'todo',
-          taskId: todo.id,
-          action: 'uncompleted',
-          value: 0
-        });
-      }
-    }
-    return { todo: this.todos.get(id)!, reward };
+    const todo = await this.updateTodo(id, { completed });
+    if (!todo) throw new Error('Todo not found');
+    
+    return { todo, reward: 0 };
   }
-
+  
   // Activity log methods
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
-    const id = this.logId++;
-    const now = new Date();
-    const activityLog: ActivityLog = { 
-      ...log, 
-      id, 
-      createdAt: now 
+    const newLog: ActivityLog = {
+      ...log,
+      id: this.nextId++,
+      createdAt: new Date()
     };
-    this.activityLogs.set(id, activityLog);
-    return activityLog;
+    this.activityLogs.push(newLog);
+    return newLog;
   }
 
   async getUserActivityLogs(userId: number, limit = 50): Promise<ActivityLog[]> {
-    return Array.from(this.activityLogs.values())
+    return this.activityLogs
       .filter(log => log.userId === userId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
   }
-  
-  // Helper methods for calculating rewards and penalties
-  private calculateReward(priority: string): number {
-    switch (priority) {
-      case 'trivial': return 5;
-      case 'easy': return 10;
-      case 'medium': return 15;
-      case 'hard': return 20;
-      default: return 10;
-    }
-  }
-  
-  private calculatePenalty(priority: string): number {
-    switch (priority) {
-      case 'trivial': return -1;
-      case 'easy': return -2;
-      case 'medium': return -5;
-      case 'hard': return -10;
-      default: return -2;
-    }
-  }
 }
 
-// Use the appropriate storage implementation based on environment
 export const storage = useMemoryStorage 
   ? new MemStorage() 
   : new SupabaseStorage();

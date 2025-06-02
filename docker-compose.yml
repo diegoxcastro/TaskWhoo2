@@ -9,9 +9,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - USE_MEMORY_STORAGE=true
+      - USE_MEMORY_STORAGE=false
       - PORT=3000
-      - DATABASE_URL=postgres://postgres:ew0iuurghbhb239ubf92fb92ufb290@n8n_postgres_1:5432/habittracker?sslmode=disable
+      - DATABASE_URL=postgres://postgres:ew0iuurghbhb239ubf92fb92ufb290@postgres:5432/habittracker?sslmode=disable
       - DB_TYPE=postgresdb
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -21,4 +21,10 @@ services:
       - ADMIN_USERNAME=awake
       - ADMIN_PASSWORD=45Seo123
       - API_KEY=Uaapo3ihgoarfboufba
-    depends_on: []
+    networks:
+      - digital_network
+    restart: unless-stopped
+
+networks:
+  digital_network:
+    external: true

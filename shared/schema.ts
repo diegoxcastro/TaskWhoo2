@@ -12,11 +12,6 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  level: integer("level").notNull().default(1),
-  experience: integer("experience").notNull().default(0),
-  health: integer("health").notNull().default(50),
-  maxHealth: integer("max_health").notNull().default(50),
-  coins: integer("coins").notNull().default(0),
   avatar: text("avatar"),
   auth_id: text("auth_id"),
   createdAt: timestamp("created_at").defaultNow()
@@ -102,19 +97,17 @@ export const activityLogs = pgTable("activity_logs", {
   taskType: taskTypeEnum("task_type").notNull(),
   taskId: integer("task_id").notNull(),
   action: text("action").notNull(), // completed, uncompleted, created, deleted, etc.
-  value: integer("value"), // Points/coins earned or lost
+  value: integer("value"), // Activity value for tracking
   createdAt: timestamp("created_at").defaultNow()
 });
 
 // Create insert schemas
-export const insertUserSchema = createInsertSchema(users, {
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true
+}).extend({
   username: z.string().min(3),
   password: z.string().min(6),
-  level: z.number().positive().default(1),
-  experience: z.number().nonnegative().default(0),
-  health: z.number().positive().default(50),
-  maxHealth: z.number().positive().default(50),
-  coins: z.number().nonnegative().default(0),
   avatar: z.string().optional(),
   auth_id: z.string().optional(),
 });
@@ -192,11 +185,6 @@ export type Database = {
           id: number
           username: string
           password: string
-          level: number
-          experience: number
-          health: number
-          max_health: number
-          coins: number
           avatar: string | null
           auth_id: string | null
           created_at: string
@@ -204,22 +192,12 @@ export type Database = {
         Insert: {
           username: string
           password: string
-          level?: number
-          experience?: number
-          health?: number
-          max_health?: number
-          coins?: number
           avatar?: string | null
           auth_id?: string | null
         }
         Update: {
           username?: string
           password?: string
-          level?: number
-          experience?: number
-          health?: number
-          max_health?: number
-          coins?: number
           avatar?: string | null
           auth_id?: string | null
         }

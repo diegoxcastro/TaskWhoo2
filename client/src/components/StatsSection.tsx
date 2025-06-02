@@ -43,12 +43,6 @@ export default function StatsSection() {
     return days.size;
   }, [activityLogs]);
 
-  // XP e moedas ganhos no período
-  const xpGained = useMemo(() => activityLogs.filter(l => (l.value ?? 0) > 0 && ["completed", "scored_up"].includes(l.action)).reduce((acc, l) => acc + (l.value ?? 0), 0), [activityLogs]);
-  const coinsGained = useMemo(() => activityLogs.filter(l => (l.value ?? 0) > 0 && ["completed", "scored_up"].includes(l.action)).reduce((acc, l) => acc + Math.floor((l.value ?? 0) / 2), 0), [activityLogs]);
-  // Penalidades sofridas (vida perdida)
-  const healthLost = useMemo(() => activityLogs.filter(l => (l.value ?? 0) < 0 && ["missed", "scored_down"].includes(l.action)).reduce((acc, l) => acc + (l.value ?? 0), 0), [activityLogs]);
-
   // Tarefas concluídas por tipo
   const completedByType = useMemo(() => {
     const result: Record<string, number> = { habit: 0, daily: 0, todo: 0 };
@@ -201,7 +195,7 @@ export default function StatsSection() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Estatísticas Avançadas</CardTitle>
+                <CardTitle className="text-lg">Estatísticas de Produtividade</CardTitle>
                 <CardDescription>Resumo da sua produtividade</CardDescription>
               </CardHeader>
               <CardContent>
@@ -213,18 +207,6 @@ export default function StatsSection() {
                   <div>
                     <p className="text-sm text-gray-500">Streak atual / máximo</p>
                     <p className="text-2xl font-bold mt-1">{streaks.current} / {streaks.max}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">XP ganhos (período)</p>
-                    <p className="text-2xl font-bold mt-1">{xpGained}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Moedas ganhas (período)</p>
-                    <p className="text-2xl font-bold mt-1">{coinsGained}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Vida perdida (penalidades)</p>
-                    <p className="text-2xl font-bold mt-1">{healthLost}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Afazeres concluídos no prazo</p>
