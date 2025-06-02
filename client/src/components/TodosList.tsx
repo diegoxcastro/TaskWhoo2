@@ -65,7 +65,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
 
   // Filtra as tarefas com base na aba ativa
   const filteredTodos = todos.filter(todo => {
-    if (activeTab === "all") return true;
+    if (activeTab === "all") return !todo.completed; // Completed todos only appear in 'completed' tab
     if (activeTab === "active") return !todo.completed;
     if (activeTab === "completed") return todo.completed;
     return true;
@@ -91,7 +91,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                   value="all" 
                   className="text-xs px-2 h-6 data-[state=active]:bg-transparent data-[state=active]:text-amber-600 data-[state=active]:underline data-[state=active]:shadow-none"
                 >
-                  Todos
+                  Ativos
                 </TabsTrigger>
                 <TabsTrigger 
                   value="active" 
@@ -135,7 +135,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
         ) : filteredTodos.length === 0 ? (
           <div className="text-center p-4 text-amber-700">
             {activeTab === "all" 
-              ? "Nenhuma tarefa encontrada. Adicione sua primeira tarefa!"
+              ? "Nenhuma tarefa ativa encontrada. Adicione sua primeira tarefa!"
               : activeTab === "active" 
                 ? "Nenhuma tarefa pendente. Bom trabalho!"
                 : "Nenhuma tarefa concluída ainda."}

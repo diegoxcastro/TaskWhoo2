@@ -1,13 +1,15 @@
-import { 
+import {
   users, type User, type InsertUser,
   habits, type Habit, type InsertHabit,
   dailies, type Daily, type InsertDaily,
   todos, type Todo, type InsertTodo,
   activityLogs, type ActivityLog, type InsertActivityLog,
-  taskVida, type TaskVida, type InsertTaskVida
+  taskVida, type TaskVida, type InsertTaskVida,
+  userSettings, type UserSettings, type InsertUserSettings,
+  notificationLogs, type NotificationLog, type InsertNotificationLog
 } from "@shared/schema";
 import { db, supabase } from "./db";
-import { eq, and, asc, desc, max } from "drizzle-orm";
+import { eq, and, asc, desc, max, lt } from "drizzle-orm";
 
 // Determinar o modo de armazenamento
 const useMemoryStorage = process.env.USE_MEMORY_STORAGE === 'true';
@@ -48,6 +50,16 @@ export interface IStorage {
   // Activity log methods
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getUserActivityLogs(userId: number, limit?: number): Promise<ActivityLog[]>;
+  
+  // User settings methods
+  getUserSettings(userId: number): Promise<UserSettings | undefined>;
+  createUserSettings(userId: number, settings: InsertUserSettings): Promise<UserSettings>;
+  updateUserSettings(userId: number, settings: Partial<InsertUserSettings>): Promise<UserSettings | undefined>;
+  
+  // Notification methods
+  getTasksWithReminders(userId: number, fromTime: Date, toTime: Date): Promise<Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}>>;
+  createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  hasNotificationBeenSent(userId: number, taskId: number, taskType: string, reminderTime: Date): Promise<boolean>;
 }
 
 // Supabase Storage implementation that uses the TaskVida table
@@ -641,6 +653,18 @@ export class SupabaseStorage implements IStorage {
     if (useMemoryStorage) {
       return this.memStorage.getTodos(userId);
     }
+    
+    // First, cleanup completed todos older than 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db
+      .delete(taskVida)
+      .where(and(
+        eq(taskVida.userId, userId),
+        eq(taskVida.type, 'todo'),
+        eq(taskVida.completed, true),
+        lt(taskVida.completedAt, twentyFourHoursAgo)
+      ));
+    
     // Get todos from TaskVida and convert to Todo type
     const tasks = await db
       .select()
@@ -875,7 +899,162 @@ export class SupabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  // User settings methods
+  async getUserSettings(userId: number): Promise<UserSettings | undefined> {
+    if (useMemoryStorage) {
+      return this.memStorage.getUserSettings(userId);
+    }
+
+    try {
+      const [settings] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
+      return settings;
+    } catch (error) {
+      console.error("Erro ao buscar configurações do usuário:", error);
+      return this.memStorage.getUserSettings(userId);
+    }
+  }
+
+  async createUserSettings(userId: number, settings: InsertUserSettings): Promise<UserSettings> {
+    if (useMemoryStorage) {
+      return this.memStorage.createUserSettings(userId, settings);
+    }
+
+    try {
+      const [newSettings] = await db.insert(userSettings).values({ ...settings, userId }).returning();
+      return newSettings;
+    } catch (error) {
+      console.error("Erro ao criar configurações do usuário:", error);
+      return this.memStorage.createUserSettings(userId, settings);
+    }
+  }
+
+  async updateUserSettings(userId: number, settings: Partial<InsertUserSettings>): Promise<UserSettings | undefined> {
+    if (useMemoryStorage) {
+      return this.memStorage.updateUserSettings(userId, settings);
+    }
+
+    try {
+      const [updated] = await db.update(userSettings).set(settings).where(eq(userSettings.userId, userId)).returning();
+      return updated;
+    } catch (error) {
+      console.error("Erro ao atualizar configurações do usuário:", error);
+      return this.memStorage.updateUserSettings(userId, settings);
+    }
+  }
+  
+  // Notification methods
+  async getTasksWithReminders(userId: number, fromTime: Date, toTime: Date): Promise<Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}>> {
+    if (useMemoryStorage) {
+      return this.memStorage.getTasksWithReminders(userId, fromTime, toTime);
+    }
+
+    try {
+      const tasks = await db
+        .select()
+        .from(taskVida)
+        .where(and(
+          eq(taskVida.userId, userId),
+          eq(taskVida.hasReminder, true)
+        ));
+
+      const results: Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}> = [];
+      
+      for (const task of tasks) {
+        if (task.reminderTime && task.reminderTime >= fromTime && task.reminderTime <= toTime) {
+          if (task.type === 'habit') {
+            const habit = this.convertTaskVidaToHabit(task);
+            results.push({ task: habit, type: 'habit' });
+          } else if (task.type === 'daily') {
+            const daily = this.convertTaskVidaToDaily(task);
+            results.push({ task: daily, type: 'daily' });
+          } else if (task.type === 'todo') {
+            const todo = this.convertTaskVidaToTodo(task);
+            results.push({ task: todo, type: 'todo' });
+          }
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error("Erro ao buscar tarefas com lembretes:", error);
+      return this.memStorage.getTasksWithReminders(userId, fromTime, toTime);
+    }
+  }
+
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    if (useMemoryStorage) {
+      return this.memStorage.createNotificationLog(log);
+    }
+
+    try {
+      const [notificationLog] = await db.insert(notificationLogs).values(log).returning();
+      return notificationLog;
+    } catch (error) {
+      console.error("Erro ao criar log de notificação:", error);
+      return this.memStorage.createNotificationLog(log);
+    }
+  }
+
+  async hasNotificationBeenSent(userId: number, taskId: number, taskType: string, reminderTime: Date): Promise<boolean> {
+    if (useMemoryStorage) {
+      return this.memStorage.hasNotificationBeenSent(userId, taskId, taskType, reminderTime);
+    }
+
+    try {
+      const logs = await db
+        .select()
+        .from(notificationLogs)
+        .where(and(
+          eq(notificationLogs.userId, userId),
+          eq(notificationLogs.taskId, taskId),
+          eq(notificationLogs.taskType, taskType)
+        ));
+      
+      return logs.some(log => 
+        Math.abs(log.reminderTime.getTime() - reminderTime.getTime()) < 60000 // Within 1 minute
+      );
+    } catch (error) {
+      console.error("Erro ao verificar se notificação foi enviada:", error);
+      return this.memStorage.hasNotificationBeenSent(userId, taskId, taskType, reminderTime);
+    }
+  }
+
   // Helper methods
+  private convertTaskVidaToHabit(task: any): Habit {
+    return {
+      id: task.id,
+      userId: task.userId,
+      title: task.title,
+      notes: task.notes || null,
+      priority: task.priority,
+      direction: task.direction || 'both',
+      strength: task.strength || 0,
+      positive: task.positive || true,
+      negative: task.negative || true,
+      counterUp: task.counterUp || 0,
+      counterDown: task.counterDown || 0,
+      createdAt: task.createdAt
+    };
+  }
+
+  private convertTaskVidaToDaily(task: any): Daily {
+    return {
+      id: task.id,
+      userId: task.userId,
+      title: task.title,
+      notes: task.notes || null,
+      priority: task.priority,
+      completed: task.completed || false,
+      streak: task.streak || 0,
+      repeat: task.repeat || [true, true, true, true, true, true, true],
+      icon: task.icon || "CheckCircle",
+      duration: task.duration || 0,
+      createdAt: task.createdAt,
+      lastCompleted: task.lastCompleted || null,
+      order: typeof task.order === 'number' ? task.order : 0
+    };
+  }
+
   private convertTaskVidaToTodo(task: any): Todo {
     return {
       id: task.id,
@@ -900,6 +1079,8 @@ export class MemStorage implements IStorage {
   private dailies: Daily[] = [];
   private todos: Todo[] = [];
   private activityLogs: ActivityLog[] = [];
+  private userSettings: UserSettings[] = [];
+  private notificationLogs: NotificationLog[] = [];
   private nextId = 1;
 
   // User methods
@@ -1108,6 +1289,83 @@ export class MemStorage implements IStorage {
       .filter(log => log.userId === userId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
+  }
+  
+  // User settings methods
+  async getUserSettings(userId: number): Promise<UserSettings | undefined> {
+    return this.userSettings.find(settings => settings.userId === userId);
+  }
+
+  async createUserSettings(userId: number, settings: InsertUserSettings): Promise<UserSettings> {
+    const newSettings: UserSettings = {
+      ...settings,
+      id: this.nextId++,
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.userSettings.push(newSettings);
+    return newSettings;
+  }
+
+  async updateUserSettings(userId: number, settings: Partial<InsertUserSettings>): Promise<UserSettings | undefined> {
+    const settingsIndex = this.userSettings.findIndex(s => s.userId === userId);
+    if (settingsIndex === -1) return undefined;
+    
+    this.userSettings[settingsIndex] = {
+      ...this.userSettings[settingsIndex],
+      ...settings,
+      updatedAt: new Date()
+    };
+    return this.userSettings[settingsIndex];
+  }
+  
+  // Notification methods
+  async getTasksWithReminders(userId: number, fromTime: Date, toTime: Date): Promise<Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}>> {
+    const results: Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}> = [];
+    
+    // Check habits
+    for (const habit of this.habits.filter(h => h.userId === userId && h.hasReminder && h.reminderTime)) {
+      if (habit.reminderTime! >= fromTime && habit.reminderTime! <= toTime) {
+        results.push({ task: habit, type: 'habit' });
+      }
+    }
+    
+    // Check dailies
+    for (const daily of this.dailies.filter(d => d.userId === userId && d.hasReminder && d.reminderTime)) {
+      if (daily.reminderTime! >= fromTime && daily.reminderTime! <= toTime) {
+        results.push({ task: daily, type: 'daily' });
+      }
+    }
+    
+    // Check todos
+    for (const todo of this.todos.filter(t => t.userId === userId && t.hasReminder && t.reminderTime)) {
+      if (todo.reminderTime! >= fromTime && todo.reminderTime! <= toTime) {
+        results.push({ task: todo, type: 'todo' });
+      }
+    }
+    
+    return results;
+  }
+
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const newLog: NotificationLog = {
+      ...log,
+      id: this.nextId++,
+      sentAt: new Date(),
+      success: true
+    };
+    this.notificationLogs.push(newLog);
+    return newLog;
+  }
+
+  async hasNotificationBeenSent(userId: number, taskId: number, taskType: string, reminderTime: Date): Promise<boolean> {
+    return this.notificationLogs.some(log => 
+      log.userId === userId && 
+      log.taskId === taskId && 
+      log.taskType === taskType && 
+      Math.abs(log.reminderTime.getTime() - reminderTime.getTime()) < 60000 // Within 1 minute
+    );
   }
 }
 

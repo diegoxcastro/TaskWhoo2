@@ -40,6 +40,10 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
   const [priority, setPriority] = useState<"trivial" | "easy" | "medium" | "hard">("easy");
   const [duration, setDuration] = useState(0);
   
+  // Reminder state
+  const [hasReminder, setHasReminder] = useState(false);
+  const [reminderTime, setReminderTime] = useState('');
+  
   // Habit-specific fields
   const [positive, setPositive] = useState(true);
   const [negative, setNegative] = useState(true);
@@ -65,7 +69,9 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           positive,
           negative,
           direction: positive && negative ? 'both' : positive ? 'positive' : 'negative',
-          duration
+          duration,
+          hasReminder,
+          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
         };
         await createHabit(habit);
       } else if (type === 'daily') {
@@ -75,7 +81,9 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           priority,
           repeat: repeat,
           icon: selectedIcon,
-          duration
+          duration,
+          hasReminder,
+          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
         };
         
         console.log('Criando tarefa diária:', daily);
@@ -86,7 +94,9 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           notes: notes || undefined,
           priority,
           dueDate: dueDate ? new Date(dueDate) : undefined,
-          duration
+          duration,
+          hasReminder,
+          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
         };
         await createTodo(todo);
       }
@@ -171,6 +181,38 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
               placeholder="0"
               className="w-full"
             />
+          </div>
+          
+          {/* Reminder options */}
+          <div className="grid gap-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="task-reminder" 
+                checked={hasReminder} 
+                onCheckedChange={(checked) => {
+                  if (typeof checked === 'boolean') {
+                    setHasReminder(checked);
+                    if (!checked) {
+                      setReminderTime('');
+                    }
+                  }
+                }}
+              />
+              <Label htmlFor="task-reminder">Definir lembrete</Label>
+            </div>
+            
+            {hasReminder && (
+              <div className="grid gap-2 ml-6">
+                <Label htmlFor="reminder-time">Horário do lembrete</Label>
+                <Input
+                  id="reminder-time"
+                  type="time"
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
           
           {/* Habit-specific options */}

@@ -58,6 +58,8 @@ export const habits = pgTable("habits", {
   counterUp: integer("counter_up").notNull().default(0),
   counterDown: integer("counter_down").notNull().default(0),
   duration: integer("duration").default(0), // Duration in minutes
+  reminderTime: timestamp("reminder_time"), // Optional reminder time
+  hasReminder: boolean("has_reminder").notNull().default(false), // Whether reminder is enabled
   createdAt: timestamp("created_at").defaultNow()
 });
 
@@ -74,6 +76,8 @@ export const dailies = pgTable("dailies", {
   repeat: json("repeat").$type<boolean[]>().notNull().default([true, true, true, true, true, true, true]),
   icon: text("icon").default("CheckCircle"),
   duration: integer("duration").default(0), // Duration in minutes
+  reminderTime: timestamp("reminder_time"), // Optional reminder time
+  hasReminder: boolean("has_reminder").notNull().default(false), // Whether reminder is enabled
   createdAt: timestamp("created_at").defaultNow(),
   lastCompleted: timestamp("last_completed"),
   order: integer("order").notNull().default(0)
@@ -89,9 +93,34 @@ export const todos = pgTable("todos", {
   completed: boolean("completed").notNull().default(false),
   dueDate: timestamp("due_date"),
   duration: integer("duration").default(0), // Duration in minutes
+  reminderTime: timestamp("reminder_time"), // Optional reminder time
+  hasReminder: boolean("has_reminder").notNull().default(false), // Whether reminder is enabled
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   order: integer("order").notNull().default(0)
+});
+
+// User settings for webhook notifications
+export const userSettings = pgTable("user_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  webhookUrl: text("webhook_url"),
+  reminderMinutesBefore: integer("reminder_minutes_before").notNull().default(15),
+  webhookEnabled: boolean("webhook_enabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at")
+});
+
+// Notification logs to prevent duplicate notifications
+export const notificationLogs = pgTable("notification_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: integer("task_id").notNull(),
+  taskType: taskTypeEnum("task_type").notNull(),
+  reminderTime: timestamp("reminder_time").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message")
 });
 
 // Activity log for tracking history and statistics
@@ -131,6 +160,11 @@ export const insertHabitSchema = createInsertSchema(habits).omit({
   createdAt: true 
 }).extend({
   duration: z.number().int().min(0).optional().default(0),
+  reminderTime: z.preprocess(
+    (arg) => typeof arg === "string" ? new Date(arg) : arg,
+    z.date().optional()
+  ),
+  hasReminder: z.boolean().optional().default(false),
 });
 
 export const insertDailySchema = createInsertSchema(dailies).omit({ 
@@ -143,6 +177,11 @@ export const insertDailySchema = createInsertSchema(dailies).omit({
 }).extend({
   priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
   duration: z.number().int().min(0).optional().default(0),
+  reminderTime: z.preprocess(
+    (arg) => typeof arg === "string" ? new Date(arg) : arg,
+    z.date().optional()
+  ),
+  hasReminder: z.boolean().optional().default(false),
 });
 
 export const insertTodoSchema = createInsertSchema(todos).omit({ 
@@ -158,6 +197,27 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
   ),
   priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
   duration: z.number().int().min(0).optional().default(0),
+  reminderTime: z.preprocess(
+    (arg) => typeof arg === "string" ? new Date(arg) : arg,
+    z.date().optional()
+  ),
+  hasReminder: z.boolean().optional().default(false),
+});
+
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({ 
+  id: true, 
+  userId: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  webhookUrl: z.string().url().optional(),
+  reminderMinutesBefore: z.number().int().min(1).max(1440).default(15),
+  webhookEnabled: z.boolean().default(false),
+});
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({ 
+  id: true, 
+  sentAt: true 
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ 
@@ -180,6 +240,12 @@ export type InsertDaily = z.infer<typeof insertDailySchema>;
 
 export type Todo = typeof todos.$inferSelect;
 export type InsertTodo = z.infer<typeof insertTodoSchema>;
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+
+export type NotificationLog = typeof notificationLogs.$inferSelect;
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;

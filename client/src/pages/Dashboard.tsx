@@ -7,13 +7,18 @@ import UserProfile from "@/components/UserProfile";
 import TasksSection from "@/components/TasksSection";
 import StatsSection from "@/components/StatsSection";
 import ImportExport from "@/components/ImportExport";
+import NotificationPanel from "@/components/NotificationPanel";
+import SettingsModal from "@/components/SettingsModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [isHome] = useRoute("/");
   const [activeTab, setActiveTab] = useState("tasks");
+  const [showSettings, setShowSettings] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -48,25 +53,50 @@ export default function Dashboard() {
       <UserProfile />
       
       <div className="container mx-auto px-4 py-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
-            <TabsTrigger value="stats">Estatísticas</TabsTrigger>
-            <TabsTrigger value="import-export">Importar/Exportar</TabsTrigger>
-          </TabsList>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Configurações
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="tasks">Tarefas</TabsTrigger>
+                <TabsTrigger value="stats">Estatísticas</TabsTrigger>
+                <TabsTrigger value="import-export">Importar/Exportar</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="tasks">
+                <TasksSection />
+              </TabsContent>
+              
+              <TabsContent value="stats">
+                <StatsSection />
+              </TabsContent>
+              
+              <TabsContent value="import-export">
+                <ImportExport />
+              </TabsContent>
+            </Tabs>
+          </div>
           
-          <TabsContent value="tasks">
-            <TasksSection />
-          </TabsContent>
-          
-          <TabsContent value="stats">
-            <StatsSection />
-          </TabsContent>
-          
-          <TabsContent value="import-export">
-            <ImportExport />
-          </TabsContent>
-        </Tabs>
+          <div className="lg:col-span-1">
+            <NotificationPanel />
+          </div>
+        </div>
+        
+        {showSettings && (
+          <SettingsModal onClose={() => setShowSettings(false)} />
+        )}
       </div>
     </div>
   );
