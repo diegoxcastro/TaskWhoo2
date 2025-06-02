@@ -26,7 +26,7 @@ export interface IStorage {
   createHabit(userId: number, habit: InsertHabit): Promise<Habit>;
   updateHabit(id: number, habitData: Partial<Habit>): Promise<Habit | undefined>;
   deleteHabit(id: number): Promise<boolean>;
-  scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }>;
+  scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit }>;
   
   // Daily methods
   getDailies(userId: number): Promise<Daily[]>;
@@ -34,7 +34,7 @@ export interface IStorage {
   createDaily(userId: number, daily: InsertDaily): Promise<Daily>;
   updateDaily(id: number, dailyData: Partial<Daily>): Promise<Daily | undefined>;
   deleteDaily(id: number): Promise<boolean>;
-  checkDaily(id: number, completed: boolean): Promise<{ daily: Daily, reward: number }>;
+  checkDaily(id: number, completed: boolean): Promise<{ daily: Daily }>;
   resetDailies(): Promise<void>; // For daily reset at midnight
   
   // Todo methods
@@ -43,7 +43,7 @@ export interface IStorage {
   createTodo(userId: number, todo: InsertTodo): Promise<Todo>;
   updateTodo(id: number, todoData: Partial<Todo>): Promise<Todo | undefined>;
   deleteTodo(id: number): Promise<boolean>;
-  checkTodo(id: number, completed: boolean): Promise<{ todo: Todo, reward: number }>;
+  checkTodo(id: number, completed: boolean): Promise<{ todo: Todo }>;
   
   // Activity log methods
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
@@ -334,7 +334,7 @@ export class SupabaseStorage implements IStorage {
     return !!deleted;
   }
 
-  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }> {
+  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit }> {
     const habit = await this.getHabit(id);
     if (!habit) {
       throw new Error('Habit not found');
@@ -357,21 +357,17 @@ export class SupabaseStorage implements IStorage {
         .where(eq(taskVida.id, id));
     }
 
-    // Calculate reward (but don't apply to user)
-    const baseReward = this.getRewardForPriority(habit.priority);
-    const reward = direction === 'up' ? baseReward : -baseReward;
-
     // Log the activity
-    await this.logActivity({
+    await this.createActivityLog({
       userId: habit.userId,
       taskId: habit.id,
       taskType: 'habit',
       action: direction === 'up' ? 'scored_up' : 'scored_down',
-      value: reward
+      value: 0
     });
 
     const updatedHabit = await this.getHabit(id);
-    return { habit: updatedHabit!, reward };
+    return { habit: updatedHabit! };
   }
 
   // Daily methods
@@ -552,11 +548,9 @@ export class SupabaseStorage implements IStorage {
     return !!deleted;
   }
 
-  async checkDaily(id: number, completed: boolean): Promise<{ daily: Daily, reward: number }> {
+  async checkDaily(id: number, completed: boolean): Promise<{ daily: Daily }> {
     const daily = await this.getDaily(id);
     if (!daily) throw new Error("Daily not found");
-
-    let reward = 0;
     let updatedStreak = daily.streak;
     const now = new Date();
     
@@ -612,7 +606,7 @@ export class SupabaseStorage implements IStorage {
     const updatedDaily = await this.getDaily(id);
     if (!updatedDaily) throw new Error("Failed to update daily");
     
-    return { daily: updatedDaily, reward };
+    return { daily: updatedDaily };
   }
 
   async resetDailies(): Promise<void> {
@@ -795,15 +789,13 @@ export class SupabaseStorage implements IStorage {
     return !!deleted;
   }
 
-  async checkTodo(id: number, completed: boolean): Promise<{ todo: Todo, reward: number }> {
+  async checkTodo(id: number, completed: boolean): Promise<{ todo: Todo }> {
     const todo = await this.getTodo(id);
     if (!todo) throw new Error("Todo not found");
 
-    let reward = 0;
     const now = new Date();
     // If marking as completed
     if (completed && !todo.completed) {
-      reward = this.calculateReward(todo.priority);
       
       // Update in TaskVida
       const [task] = await db.update(taskVida)
@@ -827,10 +819,10 @@ export class SupabaseStorage implements IStorage {
         taskType: 'todo',
         taskId: todo.id,
         action: 'completed',
-        value: reward
+        value: 0
       });
       
-      return { todo: updatedTodo, reward };
+      return { todo: updatedTodo };
     } 
     // If marking as uncompleted
     else if (!completed && todo.completed) {
@@ -859,10 +851,10 @@ export class SupabaseStorage implements IStorage {
         value: 0
       });
       
-      return { todo: updatedTodo, reward: 0 };
+      return { todo: updatedTodo };
     }
     
-    return { todo, reward };
+    return { todo };
   }
 
   // Activity log methods
@@ -983,15 +975,16 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }> {
+  async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit }> {
     const habit = await this.getHabit(id);
     if (!habit) throw new Error('Habit not found');
     
     const updatedHabit = await this.updateHabit(id, {
-      value: habit.value + (direction === 'up' ? 1 : -1)
+      counterUp: direction === 'up' ? habit.counterUp + 1 : habit.counterUp,
+      counterDown: direction === 'down' ? habit.counterDown + 1 : habit.counterDown
     });
     
-    return { habit: updatedHabit!, reward: 0 };
+    return { habit: updatedHabit! };
   }
   
   // Daily methods
@@ -1036,11 +1029,11 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  async checkDaily(id: number, completed: boolean): Promise<{ daily: Daily, reward: number }> {
+  async checkDaily(id: number, completed: boolean): Promise<{ daily: Daily }> {
     const daily = await this.updateDaily(id, { completed });
     if (!daily) throw new Error('Daily not found');
     
-    return { daily, reward: 0 };
+    return { daily };
   }
 
   async resetDailies(): Promise<void> {
@@ -1092,11 +1085,11 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  async checkTodo(id: number, completed: boolean): Promise<{ todo: Todo, reward: number }> {
+  async checkTodo(id: number, completed: boolean): Promise<{ todo: Todo }> {
     const todo = await this.updateTodo(id, { completed });
     if (!todo) throw new Error('Todo not found');
     
-    return { todo, reward: 0 };
+    return { todo };
   }
   
   // Activity log methods

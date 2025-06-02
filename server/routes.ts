@@ -37,19 +37,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// Middleware para autenticação por API key
-const apiKeyAuth: RequestHandler = (req, res, next) => {
-  if (req.path.startsWith('/api/auth/')) {
-    return next();
-  }
-  let apiKey = req.headers['x-api-key'] || req.query.api_key;
-  if (Array.isArray(apiKey)) apiKey = apiKey[0];
-  const validKey = process.env.API_KEY;
-  if (apiKey && validKey && apiKey === validKey) {
-    return next();
-  }
-  return res.status(403).json({ message: 'Forbidden: Invalid API key' });
-};
+// Note: API key authentication is now handled in the isAuthenticated middleware
+// This avoids conflicts between global API key auth and endpoint-specific authentication
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup session middleware
@@ -191,8 +180,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(401).json({ message: "Unauthorized" });
   };
 
-  // Adicionar o middleware de API key para todas as rotas /api
-  app.use('/api', apiKeyAuth);
+  // API key authentication is handled individually by the isAuthenticated middleware
+  // This allows for more flexible authentication (session OR API key)
 
   // API Routes
   // ===============================
@@ -524,13 +513,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         res.json({
           habit: result.habit,
-          reward: result.reward,
           user: userWithoutPassword
         });
       } else {
         res.json({
-          habit: result.habit,
-          reward: result.reward
+          habit: result.habit
         });
       }
     } catch (err) {
@@ -661,7 +648,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         daily: result.daily,
-        reward: result.reward,
         user: userWithoutPassword
       });
     } catch (err) {
@@ -807,7 +793,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         todo: result.todo,
-        reward: result.reward,
         user: userWithoutPassword
       });
     } catch (err) {

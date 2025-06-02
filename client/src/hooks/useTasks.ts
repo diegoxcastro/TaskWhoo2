@@ -14,7 +14,7 @@ type ScoreHabitType = {
 };
 
 type ScoreHabitResponseType = {
-  reward: number;
+  habit: any;
 };
 
 type CheckDailyType = {
@@ -23,7 +23,7 @@ type CheckDailyType = {
 };
 
 type CheckDailyResponseType = {
-  reward: number;
+  daily: any;
 };
 
 type CheckTodoType = {
@@ -32,7 +32,7 @@ type CheckTodoType = {
 };
 
 type CheckTodoResponseType = {
-  reward: number;
+  todo: any;
 };
 
 export function useTasks() {
@@ -173,21 +173,9 @@ export function useTasks() {
       // queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       // queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
       
-      const rewardText = data.reward > 0 
-        ? `Você ganhou ${data.reward} moedas!` 
-        : (data.reward < 0 ? `Você perdeu ${Math.abs(data.reward)} de vida!` : '');
-
-      if (rewardText) {
-        toast({
-          title: data.type === "up" ? "Hábito positivo pontuado!" : "Hábito negativo pontuado!",
-          description: rewardText,
-          variant: data.reward < 0 ? "destructive" : "default",
-        });
-      } else {
-        toast({
-          title: "Hábito pontuado!",
-        });
-      }
+      toast({
+        title: "Hábito pontuado!",
+      });
     },
     onError: (error: any, newHabitScoreData, context) => {
       toast({
@@ -299,16 +287,9 @@ export function useTasks() {
       // queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       // queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
       
-      if (data.reward > 0) {
-        toast({
-          title: "Tarefa diária concluída!",
-          description: `Você ganhou ${data.reward} moedas!`,
-        });
-      } else {
-        toast({
-          title: "Tarefa diária atualizada!",
-        });
-      }
+      toast({
+        title: "Tarefa diária atualizada!",
+      });
     },
     onError: (error: any, newDailyData, context) => {
       toast({
@@ -426,16 +407,9 @@ export function useTasks() {
       // A invalidação de ["/api/todos"] agora é tratada por onSettled.
       // As invalidações de usuário/autenticação já estão comentadas da etapa anterior.
       
-      if (data.reward > 0) {
-        toast({
-          title: "Tarefa concluída!",
-          description: `Você ganhou ${data.reward} moedas!`,
-        });
-      } else {
-        toast({
-          title: "Tarefa atualizada!",
-        });
-      }
+      toast({
+        title: "Tarefa atualizada!",
+      });
     },
     onError: (error: any, newTodoData, context) => {
       toast({

@@ -51,6 +51,9 @@ export function useUser() {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        headers: {
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba',
+        },
       });
       
       if (!response.ok) {
@@ -83,6 +86,9 @@ export function useUser() {
        const response = await fetch('/api/user/avatar', {
          method: 'DELETE',
          credentials: 'include',
+         headers: {
+           'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba',
+         },
        });
        
        if (!response.ok) {

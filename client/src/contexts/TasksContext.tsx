@@ -160,9 +160,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (data) => {
       toast({
-        title: data.reward > 0 ? "Habit scored!" : "Negative habit",
+        title: "Habit scored!",
         description: `${data.habit.title} completed`,
-        variant: data.reward > 0 ? "default" : "destructive",
       });
     },
   });
@@ -266,23 +265,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
     },
     onSuccess: (data) => {
-      if (data.reward > 0) {
-        toast({
-          title: "Daily completed!",
-          description: `${data.daily.title} completed successfully`,
-        });
-      } else if (data.reward < 0) {
-        toast({
-          title: "Daily missed",
-          description: `${data.daily.title} marked as missed`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Daily unchecked",
-          description: `${data.daily.title} marked as incomplete`,
-        });
-      }
+      toast({
+        title: "Daily updated!",
+        description: `${data.daily.title} status updated`,
+      });
     },
   });
 
@@ -387,17 +373,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/check"] });
     },
     onSuccess: (data) => {
-      if (data.reward > 0) {
-        toast({
-          title: "Todo concluído!",
-          description: `${data.todo.title} foi marcado como concluído.`,
-        });
-      } else {
-        toast({
-          title: "Todo unchecked",
-          description: `${data.todo.title} marked as incomplete`,
-        });
-      }
+      toast({
+        title: "Todo updated!",
+        description: `${data.todo.title} status updated`,
+      });
     },
   });
 
