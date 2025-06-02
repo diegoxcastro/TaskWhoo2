@@ -39,6 +39,8 @@ export const taskVida = pgTable("task_vida", {
   duration: integer("duration").default(0), // Duration in minutes
   lastCompleted: timestamp("last_completed"), // For dailies
   completedAt: timestamp("completed_at"), // For todos
+  reminderTime: timestamp("reminder_time"), // Optional reminder time
+  hasReminder: boolean("has_reminder").notNull().default(false), // Whether reminder is enabled
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
   order: integer("order").notNull().default(0)

@@ -684,6 +684,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       duration: task.duration || 0,
+      reminderTime: task.reminderTime || null,
+      hasReminder: task.hasReminder || false,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -711,6 +713,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       duration: task.duration || 0,
+      reminderTime: task.reminderTime || null,
+      hasReminder: task.hasReminder || false,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -738,6 +742,8 @@ export class SupabaseStorage implements IStorage {
         completed: false,
         dueDate: todoData.dueDate,
         duration: todoData.duration || 0,
+        reminderTime: todoData.reminderTime,
+        hasReminder: todoData.hasReminder || false,
         order: maxOrder + 1
       })
       .returning();
@@ -750,6 +756,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       duration: task.duration || 0,
+      reminderTime: task.reminderTime || null,
+      hasReminder: task.hasReminder || false,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -771,6 +779,8 @@ export class SupabaseStorage implements IStorage {
           completed: todoData.completed,
           dueDate: todoData.dueDate,
           duration: todoData.duration,
+          reminderTime: todoData.reminderTime,
+          hasReminder: todoData.hasReminder,
           completedAt: todoData.completedAt,
           updatedAt: new Date()
         })
@@ -1065,6 +1075,8 @@ export class SupabaseStorage implements IStorage {
       completed: task.completed || false,
       dueDate: task.dueDate || null,
       duration: task.duration || 0,
+      reminderTime: task.reminderTime || null,
+      hasReminder: task.hasReminder || false,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0

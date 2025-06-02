@@ -66,8 +66,8 @@ export default function Dashboard() {
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
+        <div className="space-y-6 mb-6">
+          <div className="w-full">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="mb-4">
                 <TabsTrigger value="tasks">Tarefas</TabsTrigger>
@@ -89,7 +89,7 @@ export default function Dashboard() {
             </Tabs>
           </div>
           
-          <div className="lg:col-span-1">
+          <div className="w-full">
             <NotificationPanel />
           </div>
         </div>
