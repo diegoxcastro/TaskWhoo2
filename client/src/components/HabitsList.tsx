@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Habit } from "@shared/schema";
 import { useTasks } from "@/contexts/TasksContext";
 import { cn } from "@/lib/utils";
-import { PlusCircle, Plus, Minus, Trash2 } from "lucide-react";
+import { PlusCircle, Plus, Minus, Trash2, Clock } from "lucide-react";
 
 interface HabitsListProps {
   habits: Habit[];
@@ -121,6 +121,12 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                       <span className="flex items-center mr-2 text-red-600">
                         <Minus className="h-3 w-3 mr-1" />
                         -{habit.counterDown}
+                      </span>
+                    )}
+                    {(habit as any).duration > 0 && (
+                      <span className="flex items-center mr-2 text-blue-600">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {(habit as any).duration}min
                       </span>
                     )}
                   </div>

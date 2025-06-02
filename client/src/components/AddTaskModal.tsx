@@ -38,6 +38,7 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState<"trivial" | "easy" | "medium" | "hard">("easy");
+  const [duration, setDuration] = useState(0);
   
   // Habit-specific fields
   const [positive, setPositive] = useState(true);
@@ -63,7 +64,8 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           priority,
           positive,
           negative,
-          direction: positive && negative ? 'both' : positive ? 'positive' : 'negative'
+          direction: positive && negative ? 'both' : positive ? 'positive' : 'negative',
+          duration
         };
         await createHabit(habit);
       } else if (type === 'daily') {
@@ -72,7 +74,8 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           notes: notes || undefined,
           priority,
           repeat: repeat,
-          icon: selectedIcon
+          icon: selectedIcon,
+          duration
         };
         
         console.log('Criando tarefa diária:', daily);
@@ -82,7 +85,8 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           title,
           notes: notes || undefined,
           priority,
-          dueDate: dueDate ? new Date(dueDate) : undefined
+          dueDate: dueDate ? new Date(dueDate) : undefined,
+          duration
         };
         await createTodo(todo);
       }
@@ -154,6 +158,19 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
                 <SelectItem value="hard">Difícil</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="task-duration">Duração estimada (minutos)</Label>
+            <Input
+              id="task-duration"
+              type="number"
+              min="0"
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+              placeholder="0"
+              className="w-full"
+            />
           </div>
           
           {/* Habit-specific options */}

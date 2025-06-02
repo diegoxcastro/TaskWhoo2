@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TasksContext";
 import { Todo } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { PlusCircle, CheckCircle, Trash2, Calendar } from "lucide-react";
+import { PlusCircle, CheckCircle, Trash2, Calendar, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DndContext, closestCenter } from '@dnd-kit/core';
@@ -212,12 +212,20 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                           {todo.notes && (
                             <p className="text-xs text-amber-600 mt-1">{todo.notes}</p>
                           )}
-                          {todo.dueDate && (
-                            <p className="text-xs text-amber-600 mt-1 flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
-                            </p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {todo.dueDate && (
+                              <span className="text-xs text-amber-600 flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Prazo: {todo.dueDate instanceof Date ? format(todo.dueDate, 'dd/MM/yyyy') : format(new Date(todo.dueDate), 'dd/MM/yyyy')}
+                              </span>
+                            )}
+                            {(todo as any).duration > 0 && (
+                              <span className="text-xs text-blue-600 flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {(todo as any).duration}min
+                              </span>
+                            )}
+                          </div>
                           {todo.completed && todo.completedAt && (
                             <p className="text-xs text-amber-400 mt-1 flex items-center">
                               <CheckCircle className="h-3 w-3 mr-1" />

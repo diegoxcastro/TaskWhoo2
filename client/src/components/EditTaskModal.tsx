@@ -38,6 +38,7 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
   const [title, setTitle] = useState(task.title || "");
   const [notes, setNotes] = useState(task.notes || "");
   const [priority, setPriority] = useState<"trivial" | "easy" | "medium" | "hard">((task.priority as any) || "easy");
+  const [duration, setDuration] = useState((task as any).duration || 0);
 
   // Habit-specific fields
   const [positive, setPositive] = useState((type === 'habit' && 'positive' in task) ? !!task.positive : true);
@@ -63,6 +64,7 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           positive,
           negative,
           direction: positive && negative ? 'both' : positive ? 'positive' : 'negative',
+          duration,
         });
       } else if (type === 'daily') {
         await updateDaily(task.id, {
@@ -71,6 +73,7 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           priority,
           repeat,
           icon: selectedIcon,
+          duration,
         });
       } else if (type === 'todo') {
         await updateTodo(task.id, {
@@ -78,6 +81,7 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           notes: notes || undefined,
           priority,
           dueDate: dueDate ? new Date(dueDate) : undefined,
+          duration,
         });
       }
       onClose();
@@ -144,6 +148,19 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
                 <SelectItem value="hard">Difícil</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="task-duration">Duração estimada (minutos)</Label>
+            <Input
+              id="task-duration"
+              type="number"
+              min="0"
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+              placeholder="0"
+              className="w-full"
+            />
           </div>
           {/* Habit-specific options */}
           {type === 'habit' && (
@@ -246,4 +263,4 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
       </DialogContent>
     </Dialog>
   );
-} 
+}

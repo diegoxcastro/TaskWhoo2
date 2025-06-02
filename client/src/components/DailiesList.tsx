@@ -238,13 +238,19 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                           {daily.notes && (
                             <p className="text-xs text-gray-500 mt-1">{daily.notes}</p>
                           )}
-                          {daily.streak > 0 && (
-                            <div className="flex items-center mt-1">
+                          <div className="flex items-center mt-1 space-x-3">
+                            {daily.streak > 0 && (
                               <span className="text-xs text-amber-600 font-medium">
                                 Sequência: {daily.streak} {daily.streak === 1 ? 'dia' : 'dias'}
                               </span>
-                            </div>
-                          )}
+                            )}
+                            {(daily as any).duration > 0 && (
+                              <span className="flex items-center text-xs text-blue-600">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {(daily as any).duration}min
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
