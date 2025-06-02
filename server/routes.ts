@@ -1198,10 +1198,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Start the scheduling
     scheduleReset();
-    
-    // Start notification service
-    startNotificationService();
   }
+
+
+
+  // Start notification service
+  startNotificationService();
 
   // === Settings Routes ===
   app.get("/api/settings", isAuthenticated, async (req, res) => {
@@ -1275,108 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Notification service function
-  const startNotificationService = () => {
-    const checkAndSendNotifications = async () => {
-      try {
-        // Get all users with webhook enabled
-        const users = await storage.getAllUsers?.() || [];
-        
-        for (const user of users) {
-          const settings = await storage.getUserSettings(user.id);
-          
-          if (!settings || !settings.webhookEnabled || !settings.webhookUrl) {
-            continue;
-          }
-          
-          const now = new Date();
-          const reminderWindow = new Date(now.getTime() + settings.reminderMinutesBefore * 60 * 1000);
-          
-          const tasksWithReminders = await storage.getTasksWithReminders(
-            user.id, 
-            now, 
-            reminderWindow
-          );
-          
-          for (const { task, type } of tasksWithReminders) {
-            const reminderTime = (task as any).reminderTime;
-            if (!reminderTime) continue;
-            
-            // Check if notification was already sent
-            const alreadySent = await storage.hasNotificationBeenSent(
-              user.id, 
-              task.id, 
-              type, 
-              reminderTime
-            );
-            
-            if (alreadySent) continue;
-            
-            // Send webhook notification
-            try {
-              const webhookPayload = {
-                taskId: task.id,
-                title: task.title,
-                type,
-                reminderTime: reminderTime.toISOString(),
-                minutesBefore: settings.reminderMinutesBefore,
-                priority: task.priority,
-                notes: task.notes || null
-              };
-              
-              const response = await fetch(settings.webhookUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(webhookPayload),
-                signal: AbortSignal.timeout(5000) // 5 second timeout
-              });
-              
-              // Log the notification
-              await storage.createNotificationLog({
-                userId: user.id,
-                taskId: task.id,
-                taskType: type,
-                reminderTime,
-                success: response.ok,
-                errorMessage: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`
-              });
-              
-            } catch (error) {
-              console.error('Error sending webhook notification:', error);
-              
-              // Log the failed notification
-              await storage.createNotificationLog({
-                userId: user.id,
-                taskId: task.id,
-                taskType: type,
-                reminderTime,
-                success: false,
-                errorMessage: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error in notification service:', error);
-      }
-    };
-    
-    // Run every minute
-    setInterval(checkAndSendNotifications, 60 * 1000);
-    
-    // Run immediately
-    checkAndSendNotifications();
-  };
 
-  // Add getAllUsers method to storage interface if it doesn't exist
-  if (!storage.getAllUsers) {
-    (storage as any).getAllUsers = async () => {
-      // This is a fallback - in a real implementation, you'd add this to the interface
-      return [];
-    };
-  }
 
   const httpServer = createServer(app);
   return httpServer;
