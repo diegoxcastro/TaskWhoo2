@@ -7,7 +7,7 @@ import {
   taskVida, type TaskVida, type InsertTaskVida
 } from "@shared/schema";
 import { db, supabase } from "./db";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, max } from "drizzle-orm";
 
 // Determinar o modo de armazenamento
 const useMemoryStorage = process.env.USE_MEMORY_STORAGE === 'true';
@@ -257,7 +257,8 @@ export class SupabaseStorage implements IStorage {
         negative: habitData.negative,
         strength: 0,
         counterUp: 0,
-        counterDown: 0
+        counterDown: 0,
+        duration: habitData.duration || 0
       })
       .returning();
     
@@ -274,6 +275,7 @@ export class SupabaseStorage implements IStorage {
       negative: task.negative || true,
       counterUp: task.counterUp || 0,
       counterDown: task.counterDown || 0,
+      duration: task.duration || 0,
       createdAt: task.createdAt
     };
   }
@@ -292,6 +294,7 @@ export class SupabaseStorage implements IStorage {
         strength: habitData.strength,
         counterUp: habitData.counterUp,
         counterDown: habitData.counterDown,
+        duration: habitData.duration,
         updatedAt: new Date()
       })
       .where(and(
@@ -315,6 +318,7 @@ export class SupabaseStorage implements IStorage {
       negative: task.negative || true,
       counterUp: task.counterUp || 0,
       counterDown: task.counterDown || 0,
+      duration: task.duration || 0,
       createdAt: task.createdAt
     };
   }
@@ -331,7 +335,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async scoreHabit(id: number, direction: 'up' | 'down'): Promise<{ habit: Habit; reward: number }> {
-    const habit = await this.getHabitById(id);
+    const habit = await this.getHabit(id);
     if (!habit) {
       throw new Error('Habit not found');
     }
@@ -366,7 +370,7 @@ export class SupabaseStorage implements IStorage {
       value: reward
     });
 
-    const updatedHabit = await this.getHabitById(id);
+    const updatedHabit = await this.getHabit(id);
     return { habit: updatedHabit!, reward };
   }
 
@@ -395,6 +399,7 @@ export class SupabaseStorage implements IStorage {
       streak: task.streak || 0,
       repeat: task.repeat || [true, true, true, true, true, true, true],
       icon: task.icon || "CheckCircle",
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       lastCompleted: task.lastCompleted || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -423,6 +428,7 @@ export class SupabaseStorage implements IStorage {
       streak: task.streak || 0,
       repeat: task.repeat || [true, true, true, true, true, true, true],
       icon: "CheckCircle",
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       lastCompleted: task.lastCompleted || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -435,7 +441,7 @@ export class SupabaseStorage implements IStorage {
     }
     // Buscar o maior valor de order atual
     const maxOrder = await db
-      .select({ max: db.fn.max(taskVida.order) })
+      .select({ max: max(taskVida.order) })
       .from(taskVida)
       .where(and(eq(taskVida.userId, userId), eq(taskVida.type, 'daily')))
       .then(res => res[0]?.max ?? 0);
@@ -450,6 +456,7 @@ export class SupabaseStorage implements IStorage {
         completed: false,
         repeat: dailyData.repeat,
         icon: dailyData.icon,
+        duration: dailyData.duration || 0,
         order: maxOrder + 1
       })
       .returning();
@@ -463,6 +470,7 @@ export class SupabaseStorage implements IStorage {
       streak: task.streak || 0,
       repeat: task.repeat || [true, true, true, true, true, true, true],
       icon: task.icon || "CheckCircle",
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       lastCompleted: task.lastCompleted || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -657,6 +665,7 @@ export class SupabaseStorage implements IStorage {
       priority: task.priority,
       completed: task.completed || false,
       dueDate: task.dueDate || null,
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -683,6 +692,7 @@ export class SupabaseStorage implements IStorage {
       priority: task.priority,
       completed: task.completed || false,
       dueDate: task.dueDate || null,
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -695,7 +705,7 @@ export class SupabaseStorage implements IStorage {
     }
     // Buscar o maior valor de order atual
     const maxOrder = await db
-      .select({ max: db.fn.max(taskVida.order) })
+      .select({ max: max(taskVida.order) })
       .from(taskVida)
       .where(and(eq(taskVida.userId, userId), eq(taskVida.type, 'todo')))
       .then(res => res[0]?.max ?? 0);
@@ -709,6 +719,7 @@ export class SupabaseStorage implements IStorage {
         priority: todoData.priority,
         completed: false,
         dueDate: todoData.dueDate,
+        duration: todoData.duration || 0,
         order: maxOrder + 1
       })
       .returning();
@@ -720,6 +731,7 @@ export class SupabaseStorage implements IStorage {
       priority: task.priority,
       completed: task.completed || false,
       dueDate: task.dueDate || null,
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0
@@ -740,6 +752,7 @@ export class SupabaseStorage implements IStorage {
           priority: todoData.priority,
           completed: todoData.completed,
           dueDate: todoData.dueDate,
+          duration: todoData.duration,
           completedAt: todoData.completedAt,
           updatedAt: new Date()
         })
@@ -760,6 +773,7 @@ export class SupabaseStorage implements IStorage {
         priority: task.priority,
         completed: task.completed || false,
         dueDate: task.dueDate || null,
+        duration: task.duration || 0,
         createdAt: task.createdAt,
         completedAt: task.completedAt || null,
         order: typeof task.order === 'number' ? task.order : 0
@@ -879,6 +893,7 @@ export class SupabaseStorage implements IStorage {
       priority: task.priority,
       completed: task.completed || false,
       dueDate: task.dueDate || null,
+      duration: task.duration || 0,
       createdAt: task.createdAt,
       completedAt: task.completedAt || null,
       order: typeof task.order === 'number' ? task.order : 0

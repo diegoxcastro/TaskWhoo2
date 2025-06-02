@@ -148,10 +148,12 @@ async function setupDatabase() {
           negative BOOLEAN,
           counter_up INTEGER DEFAULT 0,
           counter_down INTEGER DEFAULT 0,
+          value INTEGER DEFAULT 0,
           streak INTEGER DEFAULT 0,
           strength INTEGER DEFAULT 0,
           last_completed TIMESTAMP WITH TIME ZONE,
           completed_at TIMESTAMP WITH TIME ZONE,
+          duration INTEGER DEFAULT 0,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE,
           "order" INTEGER NOT NULL DEFAULT 0
@@ -166,6 +168,9 @@ async function setupDatabase() {
           value INTEGER,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+        
+        -- Adicionar coluna duration se não existir (para compatibilidade com versões anteriores)
+        ALTER TABLE task_vida ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 0;
         
         -- Criar índices para melhor performance
         CREATE INDEX IF NOT EXISTS idx_task_vida_user_id ON task_vida(user_id);

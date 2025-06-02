@@ -327,6 +327,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload avatar image
+  app.post("/api/user/avatar", isAuthenticated, upload.single('avatar'), async (req, res) => {
+    try {
+      const userId = (req as any).user!.id;
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "Nenhuma imagem enviada" });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: "Tipo de arquivo não suportado. Use JPEG, PNG, GIF ou WebP." });
+      }
+
+      // Validate file size (5MB max)
+      if (req.file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Arquivo muito grande. Tamanho máximo: 5MB." });
+      }
+
+      // Convert image to base64 data URL
+      const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      
+      // Update user avatar in database
+      const updatedUser = await storage.updateUser(userId, { avatar: base64Image });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // Don't send the password back to the client
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ 
+        message: "Avatar atualizado com sucesso", 
+        user: userWithoutPassword 
+      });
+    } catch (err) {
+      console.error("Erro ao fazer upload do avatar:", err);
+      res.status(500).json({ 
+        message: "Erro interno do servidor", 
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+   });
+
+  // Remove avatar (set to null)
+  app.delete("/api/user/avatar", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user!.id;
+      
+      // Update user avatar to null in database
+      const updatedUser = await storage.updateUser(userId, { avatar: null });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // Don't send the password back to the client
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ 
+        message: "Avatar removido com sucesso", 
+        user: userWithoutPassword 
+      });
+    } catch (err) {
+      console.error("Erro ao remover avatar:", err);
+      res.status(500).json({ 
+        message: "Erro interno do servidor", 
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  });
+
   // === Habit Routes ===
   app.get("/api/habits", isAuthenticated, async (req, res) => {
     try {

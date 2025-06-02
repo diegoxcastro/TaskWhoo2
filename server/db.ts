@@ -61,12 +61,17 @@ if (!useMemoryStorage) {
       }
     };
     
-    // Configurar cliente Supabase para autenticação
-    const supabaseUrl = process.env.SUPABASE_URL_BROWSER || FALLBACK_URL;
-    const supabaseKey = process.env.SUPABASE_KEY || FALLBACK_KEY;
-    
-    supabase = createClient<Database>(supabaseUrl, supabaseKey);
-    console.log("Cliente Supabase inicializado com sucesso");
+    // Configurar cliente Supabase apenas se as variáveis estiverem definidas
+    if (process.env.SUPABASE_URL_BROWSER && process.env.SUPABASE_KEY) {
+      const supabaseUrl = process.env.SUPABASE_URL_BROWSER;
+      const supabaseKey = process.env.SUPABASE_KEY;
+      
+      supabase = createClient<Database>(supabaseUrl, supabaseKey);
+      console.log("Cliente Supabase inicializado com sucesso");
+    } else {
+      console.log("Variáveis do Supabase não configuradas - usando apenas PostgreSQL");
+      supabase = null as any;
+    }
     
     // Testar a conexão imediatamente
     console.log("Testando conexão com o PostgreSQL local...");
@@ -120,16 +125,45 @@ function setupMemoryStorage() {
   
   // Criar objeto db mock com métodos necessários para evitar erros
   db = {
-    select: () => ({ from: () => ({ where: () => [] }) }),
-    insert: () => ({ values: () => ({ returning: () => [{ id: 1 }] }) }),
+    select: (fields: any) => {
+      const mockQuery = {
+        from: () => mockQuery,
+        where: () => mockQuery,
+        then: async (callback: any) => {
+          // Se está selecionando max, retorna o valor esperado
+          if (fields && fields.max && fields.max.max) {
+            return callback([{ max: 0 }]);
+          }
+          return callback([]);
+        }
+      };
+      return mockQuery;
+    },
+    insert: () => ({ 
+      values: () => ({ 
+        returning: () => [{ 
+          id: Math.floor(Math.random() * 1000) + 1,
+          userId: 1,
+          title: 'Mock Task',
+          type: 'todo',
+          priority: 'easy',
+          completed: false,
+          createdAt: new Date(),
+          order: 1
+        }] 
+      }) 
+    }),
     update: () => ({ set: () => ({ where: () => ({ returning: () => [{ id: 1 }] }) }) }),
     delete: () => ({ where: () => ({ returning: () => [{ id: 1 }] }) }),
     execute: async () => ({ rows: [] }),
+    fn: {
+      max: (column: any) => ({ max: column })
+    }
   };
   
-  // Usar URL e KEY padrão para o Supabase
-  supabase = createClient<Database>(FALLBACK_URL, FALLBACK_KEY);
-  console.log("Cliente Supabase mock inicializado para modo de memória");
+  // Desabilitar Supabase no modo de memória
+  console.log("Modo de memória - Supabase desabilitado");
+  supabase = null as any;
 }
 
 export { pool, db };

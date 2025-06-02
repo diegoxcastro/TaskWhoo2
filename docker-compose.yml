@@ -11,9 +11,9 @@ services:
       - NODE_ENV=production
       - USE_MEMORY_STORAGE=false
       - PORT=3000
-      - DATABASE_URL=postgres://postgres:ew0iuurghbhb239ubf92fb92ufb290@postgres:5432/habittracker?sslmode=disable
+      - DATABASE_URL=postgres://postgres:ew0iuurghbhb239ubf92fb92ufb290@n8n_postgres_1:5432/habittracker?sslmode=disable
       - DB_TYPE=postgresdb
-      - DB_HOST=postgres
+      - DB_HOST=n8n_postgres_1
       - DB_PORT=5432
       - DB_DATABASE=habittracker
       - DB_USER=postgres

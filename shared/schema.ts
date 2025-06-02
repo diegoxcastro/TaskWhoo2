@@ -36,6 +36,7 @@ export const taskVida = pgTable("task_vida", {
   counterDown: integer("counter_down").default(0), // For habits
   streak: integer("streak").default(0), // For dailies
   strength: integer("strength").default(0), // For habits
+  duration: integer("duration").default(0), // Duration in minutes
   lastCompleted: timestamp("last_completed"), // For dailies
   completedAt: timestamp("completed_at"), // For todos
   createdAt: timestamp("created_at").defaultNow(),
@@ -56,6 +57,7 @@ export const habits = pgTable("habits", {
   negative: boolean("negative").notNull().default(true), // Can be clicked "-"
   counterUp: integer("counter_up").notNull().default(0),
   counterDown: integer("counter_down").notNull().default(0),
+  duration: integer("duration").default(0), // Duration in minutes
   createdAt: timestamp("created_at").defaultNow()
 });
 
@@ -71,6 +73,7 @@ export const dailies = pgTable("dailies", {
   // Weekdays when this daily is active (0-6, Sunday is 0)
   repeat: json("repeat").$type<boolean[]>().notNull().default([true, true, true, true, true, true, true]),
   icon: text("icon").default("CheckCircle"),
+  duration: integer("duration").default(0), // Duration in minutes
   createdAt: timestamp("created_at").defaultNow(),
   lastCompleted: timestamp("last_completed"),
   order: integer("order").notNull().default(0)
@@ -85,6 +88,7 @@ export const todos = pgTable("todos", {
   priority: taskPriorityEnum("priority").notNull().default('easy'),
   completed: boolean("completed").notNull().default(false),
   dueDate: timestamp("due_date"),
+  duration: integer("duration").default(0), // Duration in minutes
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   order: integer("order").notNull().default(0)
@@ -125,6 +129,8 @@ export const insertHabitSchema = createInsertSchema(habits).omit({
   counterUp: true, 
   counterDown: true, 
   createdAt: true 
+}).extend({
+  duration: z.number().int().min(0).optional().default(0),
 });
 
 export const insertDailySchema = createInsertSchema(dailies).omit({ 
@@ -136,6 +142,7 @@ export const insertDailySchema = createInsertSchema(dailies).omit({
   lastCompleted: true 
 }).extend({
   priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
+  duration: z.number().int().min(0).optional().default(0),
 });
 
 export const insertTodoSchema = createInsertSchema(todos).omit({ 
@@ -150,6 +157,7 @@ export const insertTodoSchema = createInsertSchema(todos).omit({
     z.date().optional()
   ),
   priority: z.enum(taskPriorityEnum.enumValues).default('easy'),
+  duration: z.number().int().min(0).optional().default(0),
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ 
