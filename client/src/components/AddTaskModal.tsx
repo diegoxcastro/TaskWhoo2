@@ -44,6 +44,14 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
   const [hasReminder, setHasReminder] = useState(false);
   const [reminderTime, setReminderTime] = useState('');
   
+  // Function to get current time rounded up to next hour
+  const getCurrentTimeRoundedUp = () => {
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(now.getHours() + 1, 0, 0, 0); // Round up to next hour
+    return nextHour.toTimeString().slice(0, 5); // Format as HH:MM
+  };
+  
   // Habit-specific fields
   const [positive, setPositive] = useState(true);
   const [negative, setNegative] = useState(true);
@@ -194,6 +202,9 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
                     setHasReminder(checked);
                     if (!checked) {
                       setReminderTime('');
+                    } else {
+                      // Set default reminder time to current time rounded up to next hour
+                      setReminderTime(getCurrentTimeRoundedUp());
                     }
                   }
                 }}

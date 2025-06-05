@@ -42,7 +42,10 @@ export default function NotificationPanel() {
   const loadUpcomingNotifications = async () => {
     try {
       const response = await fetch('/api/notifications/upcoming', {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba'
+        }
       });
       
       if (response.ok) {
@@ -61,7 +64,10 @@ export default function NotificationPanel() {
   const loadSettings = async () => {
     try {
       const response = await fetch('/api/settings', {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba'
+        }
       });
       
       if (response.ok) {

@@ -101,85 +101,18 @@ async function setupDatabase() {
       await client.query('SELECT NOW()');
       console.log("✅ Conexão com PostgreSQL/habittracker confirmada");
       
-      // Criar enums se não existirem
-      await client.query(`
-        DO $$ BEGIN
-          CREATE TYPE task_type AS ENUM ('habit', 'daily', 'todo');
-        EXCEPTION
-          WHEN duplicate_object THEN null;
-        END $$;
-        
-        DO $$ BEGIN
-          CREATE TYPE task_priority AS ENUM ('trivial', 'easy', 'medium', 'hard');
-        EXCEPTION
-          WHEN duplicate_object THEN null;
-        END $$;
-        
-        DO $$ BEGIN
-          CREATE TYPE habit_direction AS ENUM ('positive', 'negative', 'both');
-        EXCEPTION
-          WHEN duplicate_object THEN null;
-        END $$;
-      `);
-      
-      // Criar tabelas se não existirem
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id SERIAL PRIMARY KEY,
-          username TEXT NOT NULL UNIQUE,
-          password TEXT NOT NULL,
-          avatar TEXT,
-          auth_id TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS task_vida (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          notes TEXT,
-          type task_type NOT NULL,
-          priority task_priority NOT NULL DEFAULT 'easy',
-          completed BOOLEAN DEFAULT FALSE,
-          due_date TIMESTAMP WITH TIME ZONE,
-          repeat BOOLEAN[] DEFAULT '{true,true,true,true,true,true,true}',
-          direction habit_direction,
-          positive BOOLEAN,
-          negative BOOLEAN,
-          counter_up INTEGER DEFAULT 0,
-          counter_down INTEGER DEFAULT 0,
-          value INTEGER DEFAULT 0,
-          streak INTEGER DEFAULT 0,
-          strength INTEGER DEFAULT 0,
-          last_completed TIMESTAMP WITH TIME ZONE,
-          completed_at TIMESTAMP WITH TIME ZONE,
-          duration INTEGER DEFAULT 0,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE,
-          "order" INTEGER NOT NULL DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS activity_logs (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          task_type task_type NOT NULL,
-          task_id INTEGER NOT NULL,
-          action TEXT NOT NULL,
-          value INTEGER,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        -- Adicionar coluna duration se não existir (para compatibilidade com versões anteriores)
-        ALTER TABLE task_vida ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 0;
-        
-        -- Criar índices para melhor performance
-        CREATE INDEX IF NOT EXISTS idx_task_vida_user_id ON task_vida(user_id);
-        CREATE INDEX IF NOT EXISTS idx_task_vida_type ON task_vida(type);
-        CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
-      `);
-      
       client.release();
-      console.log("✅ Database tables e índices configurados com sucesso");
+      console.log("✅ Conexão com PostgreSQL/habittracker confirmada");
+      
+      // Run Drizzle migrations
+      console.log("Executando migrações do Drizzle...");
+      try {
+        await migrate(db, { migrationsFolder: "./migrations" });
+        console.log("✅ Migrações executadas com sucesso");
+      } catch (migrationError) {
+        console.error("❌ Erro ao executar migrações:", migrationError);
+        // Continue anyway as basic tables are created
+      }
     } catch (error) {
       console.error("❌ Erro ao configurar tabelas do banco de dados:", error);
       console.log("⚠️ Continuando com inicialização...");

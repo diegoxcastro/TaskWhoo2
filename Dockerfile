@@ -29,6 +29,9 @@ RUN npm install
 # Copy the built application from the builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy migrations folder which is needed for Drizzle migrations
+COPY --from=builder /app/migrations ./migrations
+
 EXPOSE 3000
 
 # Command to run the application in production

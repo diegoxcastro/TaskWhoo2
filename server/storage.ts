@@ -60,6 +60,7 @@ export interface IStorage {
   getTasksWithReminders(userId: number, fromTime: Date, toTime: Date): Promise<Array<{task: Habit | Daily | Todo, type: 'habit' | 'daily' | 'todo'}>>;
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
   hasNotificationBeenSent(userId: number, taskId: number, taskType: string, reminderTime: Date): Promise<boolean>;
+  getAllUsers(): Promise<User[]>;
 }
 
 // Supabase Storage implementation that uses the TaskVida table
@@ -1029,6 +1030,20 @@ export class SupabaseStorage implements IStorage {
     }
   }
 
+  async getAllUsers(): Promise<User[]> {
+    if (useMemoryStorage) {
+      return this.memStorage.getAllUsers();
+    }
+
+    try {
+      const allUsers = await db.select().from(users);
+      return allUsers;
+    } catch (error) {
+      console.error("Erro ao buscar todos os usuários:", error);
+      return this.memStorage.getAllUsers();
+    }
+  }
+
   // Helper methods
   private convertTaskVidaToHabit(task: any): Habit {
     return {
@@ -1372,12 +1387,16 @@ export class MemStorage implements IStorage {
   }
 
   async hasNotificationBeenSent(userId: number, taskId: number, taskType: string, reminderTime: Date): Promise<boolean> {
-    return this.notificationLogs.some(log => 
-      log.userId === userId && 
-      log.taskId === taskId && 
-      log.taskType === taskType && 
+    return this.notificationLogs.some(log =>
+      log.userId === userId &&
+      log.taskId === taskId &&
+      log.taskType === taskType &&
       Math.abs(log.reminderTime.getTime() - reminderTime.getTime()) < 60000 // Within 1 minute
     );
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 }
 

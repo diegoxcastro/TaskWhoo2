@@ -148,22 +148,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication middleware
   const isAuthenticated: RequestHandler = async (req, res, next) => {
+    // Debug logging for authentication issues
+    console.log(`[AUTH] ${req.method} ${req.path} - Session ID: ${req.sessionID || 'none'}`);
+    console.log(`[AUTH] User in session: ${(req as any).user ? (req as any).user.username : 'none'}`);
+    console.log(`[AUTH] isAuthenticated(): ${(req as any).isAuthenticated ? (req as any).isAuthenticated() : 'no method'}`);
+    
     // Permitir acesso se a API Key for válida
     let apiKey = req.headers['x-api-key'] || req.query.api_key;
     if (Array.isArray(apiKey)) apiKey = apiKey[0];
     const validKey = process.env.API_KEY;
+    
+    console.log(`[AUTH] API Key from request: ${apiKey ? 'present' : 'missing'}`);
+    console.log(`[AUTH] Valid API Key from env: ${validKey ? 'present' : 'missing'}`);
+    
     if (apiKey && validKey && apiKey === validKey) {
+      console.log('[AUTH] API Key authentication successful');
       // Buscar usuário admin e atribuir a req.user
       const adminUser = await storage.getUserByUsername(process.env.ADMIN_USERNAME || 'awake');
       if (adminUser) {
         (req as any).user = adminUser;
         return next();
       } else {
+        console.log('[AUTH] Admin user not found for API Key auth');
         return res.status(403).json({ message: "Usuário admin não encontrado para autenticação via API Key" });
       }
+    } else if (apiKey && validKey) {
+      console.log('[AUTH] API Key mismatch - authentication failed');
     }
-    if (process.env.NODE_ENV === "development") {
-      if (!(req as any).user) {
+    
+    // Check for session-based authentication first
+    if ((req as any).isAuthenticated && (req as any).isAuthenticated() && (req as any).user) {
+      console.log('[AUTH] Session authentication successful');
+      return next();
+    }
+    
+    // Fallback to development mode or auto-login for Docker environment
+    if (process.env.NODE_ENV === "development" || !process.env.NODE_ENV) {
+      console.log('[AUTH] Using development/fallback authentication');
+      // Try to get the admin user for fallback authentication
+      const adminUser = await storage.getUserByUsername(process.env.ADMIN_USERNAME || 'awake');
+      if (adminUser) {
+        (req as any).user = adminUser;
+        // Also set up the session for future requests
+        (req as any).login(adminUser, (err: any) => {
+          if (err) console.log('[AUTH] Session setup error:', err);
+        });
+        return next();
+      } else {
+        // Create a mock user if no admin user exists
         (req as any).user = {
           id: 1,
           username: "dev-user",
@@ -172,12 +204,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           auth_id: null,
           createdAt: new Date()
         };
+        return next();
       }
-      return next();
     }
-    if ((req as any).isAuthenticated && (req as any).isAuthenticated() && (req as any).user) {
-      return next();
-    }
+    
+    console.log('[AUTH] Authentication failed - returning 401');
     res.status(401).json({ message: "Unauthorized" });
   };
 
@@ -1204,15 +1235,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const startNotificationService = () => {
     const checkAndSendNotifications = async () => {
       try {
+        console.log('[WEBHOOK] Checking for notifications to send...');
         // Get all users with webhook enabled
-        const users = await storage.getAllUsers?.() || [];
+        const users = await storage.getAllUsers();
+        console.log(`[WEBHOOK] Found ${users.length} users to check`);
         
         for (const user of users) {
           const settings = await storage.getUserSettings(user.id);
           
           if (!settings || !settings.webhookEnabled || !settings.webhookUrl) {
+            console.log(`[WEBHOOK] User ${user.username} (${user.id}) - webhook disabled or not configured`);
             continue;
           }
+          
+          console.log(`[WEBHOOK] User ${user.username} (${user.id}) - webhook enabled, checking tasks...`);
           
           const now = new Date();
           const reminderWindow = new Date(now.getTime() + settings.reminderMinutesBefore * 60 * 1000);
@@ -1222,6 +1258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             now, 
             reminderWindow
           );
+          
+          console.log(`[WEBHOOK] User ${user.username} (${user.id}) - found ${tasksWithReminders.length} tasks with reminders`);
           
           for (const { task, type } of tasksWithReminders) {
             const reminderTime = (task as any).reminderTime;
@@ -1268,8 +1306,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 errorMessage: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`
               });
               
+              if (response.ok) {
+                console.log(`[WEBHOOK] Successfully sent notification for task "${task.title}" to ${settings.webhookUrl}`);
+              } else {
+                console.error(`[WEBHOOK] Failed to send notification for task "${task.title}" - HTTP ${response.status}: ${response.statusText}`);
+              }
+              
             } catch (error) {
-              console.error('Error sending webhook notification:', error);
+              console.error(`[WEBHOOK] Error sending webhook notification for task "${task.title}":`, error);
               
               // Log the failed notification
               await storage.createNotificationLog({
@@ -1294,14 +1338,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Run immediately
     checkAndSendNotifications();
   };
-
-  // Add getAllUsers method to storage interface if it doesn't exist
-  if (!storage.getAllUsers) {
-    (storage as any).getAllUsers = async () => {
-      // This is a fallback - in a real implementation, you'd add this to the interface
-      return [];
-    };
-  }
 
   // Start notification service
   startNotificationService();

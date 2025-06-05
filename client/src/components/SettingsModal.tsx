@@ -36,7 +36,10 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const loadSettings = async () => {
     try {
       const response = await fetch('/api/settings', {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba'
+        }
       });
       
       if (response.ok) {
@@ -63,7 +66,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_API_KEY || 'Uaapo3ihgoarfboufba'
         },
         credentials: 'include',
         body: JSON.stringify({

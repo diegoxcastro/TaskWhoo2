@@ -1,0 +1,15 @@
+{
+  "id": "0001_add_reminders_and_settings",
+  "prevId": "0000_curved_lester",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {},
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
