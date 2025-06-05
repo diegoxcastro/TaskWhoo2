@@ -76,7 +76,12 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           direction: positive && negative ? 'both' : positive ? 'positive' : 'negative',
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined,
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined,
         });
       } else if (type === 'daily') {
         await updateDaily(task.id, {
@@ -87,7 +92,12 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           icon: selectedIcon,
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined,
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined,
         });
       } else if (type === 'todo') {
         await updateTodo(task.id, {
@@ -97,7 +107,12 @@ export default function EditTaskModal({ type, task, onClose }: EditTaskModalProp
           dueDate: dueDate ? new Date(dueDate) : undefined,
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined,
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined,
         });
       }
       onClose();

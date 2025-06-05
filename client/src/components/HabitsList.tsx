@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Habit } from "@shared/schema";
 import { useTasks } from "@/contexts/TasksContext";
-import { cn } from "@/lib/utils";
+import { cn, getOverdueClass, sortTasksByReminderTime, isReminderOverdue } from "@/lib/utils";
 import { PlusCircle, Plus, Minus, Trash2, Clock } from "lucide-react";
 
 interface HabitsListProps {
@@ -12,6 +12,9 @@ interface HabitsListProps {
 
 export default function HabitsList({ habits, isLoading }: HabitsListProps) {
   const { openAddTaskModal, scoreHabit, deleteHabit, openEditTaskModal } = useTasks();
+
+  // Sort habits by reminder time (overdue first, then by time)
+  const sortedHabits = sortTasksByReminderTime(habits);
 
   // Get priority class based on habit priority
   const getPriorityClass = (priority: string) => {
@@ -67,17 +70,18 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
               </div>
             </div>
           ))
-        ) : habits.length === 0 ? (
+        ) : sortedHabits.length === 0 ? (
           <div className="text-center p-4 text-gray-500">
             Nenhum hábito encontrado. Adicione seu primeiro hábito!
           </div>
         ) : (
-          habits.map((habit) => (
+          sortedHabits.map((habit) => (
             <div 
               key={habit.id} 
               className={cn(
                 "task-card bg-white border border-gray-200 rounded-md p-3 transition-all flex items-center justify-between",
-                getPriorityClass(habit.priority)
+                getPriorityClass(habit.priority),
+                getOverdueClass(habit.hasReminder || false, habit.reminderTime)
               )}
               onClick={() => openEditTaskModal('habit', habit)}
               style={{ cursor: 'pointer' }}
@@ -97,18 +101,43 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                 )}
                 <div className="flex-grow">
                   <div className="flex justify-between">
-                    <span className="font-medium">{habit.title}</span>
-                    <button 
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm('Tem certeza que deseja excluir este hábito?')) {
-                          deleteHabit(habit.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{habit.title}</span>
+                      {habit.hasReminder && habit.reminderTime && (
+                        <div className={cn(
+                          "flex items-center text-xs mt-1",
+                          isReminderOverdue(habit.reminderTime) ? "text-red-600" : "text-gray-500"
+                        )}>
+                          <Clock className="h-3 w-3 mr-1" />
+                          {new Date(habit.reminderTime).toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                          {isReminderOverdue(habit.reminderTime) && (
+                            <span className="ml-1 text-red-600 font-medium">• Vencido</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <button 
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Tem certeza que deseja excluir este hábito?')) {
+                            deleteHabit(habit.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <span className="text-xs text-gray-500">
+                        {habit.priority === 'trivial' && '⚪'}
+                        {habit.priority === 'easy' && '🟢'}
+                        {habit.priority === 'medium' && '🟡'}
+                        {habit.priority === 'hard' && '🔴'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex text-xs text-gray-500 mt-1">
                     {habit.counterUp > 0 && (

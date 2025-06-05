@@ -1251,19 +1251,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[WEBHOOK] User ${user.username} (${user.id}) - webhook enabled, checking tasks...`);
           
           const now = new Date();
-          const reminderWindow = new Date(now.getTime() + settings.reminderMinutesBefore * 60 * 1000);
+          // Buscar lembretes que deveriam ter sido enviados (reminderTime - minutesBefore <= now <= reminderTime + 1 minuto)
+          const reminderWindowStart = new Date(now.getTime() - settings.reminderMinutesBefore * 60 * 1000 - 60 * 1000); // 1 minuto extra para margem
+          const reminderWindowEnd = new Date(now.getTime() + 60 * 1000); // 1 minuto no futuro para capturar lembretes próximos
           
           const tasksWithReminders = await storage.getTasksWithReminders(
             user.id, 
-            now, 
-            reminderWindow
+            reminderWindowStart, 
+            reminderWindowEnd
           );
           
           console.log(`[WEBHOOK] User ${user.username} (${user.id}) - found ${tasksWithReminders.length} tasks with reminders`);
+          console.log(`[WEBHOOK] Time window: ${reminderWindowStart.toISOString()} to ${reminderWindowEnd.toISOString()}`);
+          console.log(`[WEBHOOK] Current time: ${now.toISOString()}, Minutes before: ${settings.reminderMinutesBefore}`);
           
           for (const { task, type } of tasksWithReminders) {
             const reminderTime = (task as any).reminderTime;
-            if (!reminderTime) continue;
+            if (!reminderTime) {
+              console.log(`[WEBHOOK] Task "${task.title}" has no reminderTime, skipping`);
+              continue;
+            }
+            
+            // Verificar se é hora de enviar o lembrete (reminderTime - minutesBefore <= now)
+            const notificationTime = new Date(reminderTime.getTime() - settings.reminderMinutesBefore * 60 * 1000);
+            console.log(`[WEBHOOK] Task "${task.title}" - reminderTime: ${reminderTime.toISOString()}, notificationTime: ${notificationTime.toISOString()}`);
+            
+            if (now < notificationTime) {
+              console.log(`[WEBHOOK] Task "${task.title}" - not yet time to send (${now.toISOString()} < ${notificationTime.toISOString()})`);
+              continue; // Ainda não é hora de enviar
+            }
             
             // Check if notification was already sent
             const alreadySent = await storage.hasNotificationBeenSent(
@@ -1273,7 +1289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               reminderTime
             );
             
-            if (alreadySent) continue;
+            if (alreadySent) {
+              console.log(`[WEBHOOK] Task "${task.title}" - notification already sent`);
+              continue;
+            }
+            
+            console.log(`[WEBHOOK] Task "${task.title}" - ready to send notification`);
             
             // Send webhook notification
             try {
@@ -1395,18 +1416,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).user!.id;
       const now = new Date();
-      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       
-      const tasksWithReminders = await storage.getTasksWithReminders(userId, now, twoHoursLater);
+      // Buscar todas as tarefas com lembretes nas próximas 24 horas
+      const tasksWithReminders = await storage.getTasksWithReminders(userId, now, twentyFourHoursLater);
       
-      const upcomingNotifications = tasksWithReminders.map(({ task, type }) => ({
-        id: task.id,
-        title: task.title,
-        type,
-        reminderTime: (task as any).reminderTime,
-        priority: task.priority,
-        notes: task.notes
-      }));
+      // Obter configurações do usuário para calcular o tempo de notificação
+      const settings = await storage.getUserSettings(userId);
+      const minutesBefore = settings?.reminderMinutesBefore || 15;
+      
+      const upcomingNotifications = tasksWithReminders.map(({ task, type }) => {
+        const reminderTime = (task as any).reminderTime;
+        const notificationTime = reminderTime ? new Date(reminderTime.getTime() - minutesBefore * 60 * 1000) : null;
+        
+        return {
+          id: task.id,
+          title: task.title,
+          type,
+          reminderTime,
+          notificationTime, // Quando a notificação será enviada
+          priority: task.priority,
+          notes: task.notes
+        };
+      });
       
       res.json(upcomingNotifications);
     } catch (err) {
@@ -1414,7 +1446,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rota de debug temporária para verificar tarefas com lembretes
+  app.get("/api/debug/tasks-with-reminders", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user!.id;
+      
+      // Buscar todas as tarefas do usuário
+      const habits = await storage.getHabits(userId);
+      const dailies = await storage.getDailies(userId);
+      const todos = await storage.getTodos(userId);
+      
+      const allTasks = [
+        ...habits.map(h => ({ ...h, type: 'habit' })),
+        ...dailies.map(d => ({ ...d, type: 'daily' })),
+        ...todos.map(t => ({ ...t, type: 'todo' }))
+      ];
+      
+      const tasksWithReminderInfo = allTasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        type: task.type,
+        hasReminder: (task as any).hasReminder,
+        reminderTime: (task as any).reminderTime,
+        reminderTimeString: (task as any).reminderTime ? new Date((task as any).reminderTime).toISOString() : null
+      }));
+      
+      const tasksWithReminders = tasksWithReminderInfo.filter(t => t.hasReminder);
+      
+      res.json({
+        totalTasks: allTasks.length,
+        tasksWithReminders: tasksWithReminders.length,
+        allTasksInfo: tasksWithReminderInfo,
+        onlyTasksWithReminders: tasksWithReminders
+      });
+    } catch (err) {
+      console.error('Debug route error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 
+  // Rota para corrigir tarefas com datas de 1970
+  app.post("/api/debug/fix-reminder-dates", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).user!.id;
+      let fixedCount = 0;
+      
+      // Buscar todas as tarefas do usuário
+      const habits = await storage.getHabits(userId);
+      const dailies = await storage.getDailies(userId);
+      const todos = await storage.getTodos(userId);
+      
+      // Função para corrigir data de 1970
+      const fixReminderTime = (reminderTime: Date) => {
+        if (reminderTime.getFullYear() === 1970) {
+          const today = new Date();
+          today.setHours(reminderTime.getHours(), reminderTime.getMinutes(), 0, 0);
+          return today;
+        }
+        return reminderTime;
+      };
+      
+      // Corrigir hábitos
+      for (const habit of habits) {
+        if ((habit as any).hasReminder && (habit as any).reminderTime) {
+          const oldTime = new Date((habit as any).reminderTime);
+          if (oldTime.getFullYear() === 1970) {
+            const newTime = fixReminderTime(oldTime);
+            await storage.updateHabit(habit.id, { reminderTime: newTime });
+            fixedCount++;
+          }
+        }
+      }
+      
+      // Corrigir tarefas diárias
+      for (const daily of dailies) {
+        if ((daily as any).hasReminder && (daily as any).reminderTime) {
+          const oldTime = new Date((daily as any).reminderTime);
+          if (oldTime.getFullYear() === 1970) {
+            const newTime = fixReminderTime(oldTime);
+            await storage.updateDaily(daily.id, { reminderTime: newTime });
+            fixedCount++;
+          }
+        }
+      }
+      
+      // Corrigir todos
+      for (const todo of todos) {
+        if ((todo as any).hasReminder && (todo as any).reminderTime) {
+          const oldTime = new Date((todo as any).reminderTime);
+          if (oldTime.getFullYear() === 1970) {
+            const newTime = fixReminderTime(oldTime);
+            await storage.updateTodo(todo.id, { reminderTime: newTime });
+            fixedCount++;
+          }
+        }
+      }
+      
+      res.json({
+        message: `Corrigidas ${fixedCount} tarefas com datas de 1970`,
+        fixedCount
+      });
+    } catch (err) {
+      console.error('Fix reminder dates error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

@@ -33,8 +33,8 @@ export default function NotificationPanel() {
     loadUpcomingNotifications();
     loadSettings();
     
-    // Refresh every 5 minutes
-    const interval = setInterval(loadUpcomingNotifications, 5 * 60 * 1000);
+    // Refresh every 1 minute
+    const interval = setInterval(loadUpcomingNotifications, 1 * 60 * 1000);
     
     return () => clearInterval(interval);
   }, []);
@@ -305,7 +305,7 @@ export default function NotificationPanel() {
         <div className="mt-4 pt-3 border-t space-y-3">
           <div className="text-xs text-gray-500 flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            Atualizando a cada 5 minutos
+            Atualizando a cada 1 minuto
           </div>
           
           {settings?.webhookEnabled && settings?.webhookUrl && (

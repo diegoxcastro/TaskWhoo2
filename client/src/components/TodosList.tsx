@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTasks } from "@/contexts/TasksContext";
 import { Todo } from "@shared/schema";
-import { cn } from "@/lib/utils";
+import { cn, getOverdueClass, sortTasksByReminderTime, isReminderOverdue } from "@/lib/utils";
 import { PlusCircle, CheckCircle, Trash2, Calendar, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,6 +71,9 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
     return true;
   });
 
+  // Sort filtered todos by reminder time (overdue first, then by time)
+  const sortedTodos = sortTasksByReminderTime(filteredTodos);
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
       <div className="mb-4 border-b border-gray-200 pb-2">
@@ -132,7 +135,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
               </div>
             </div>
           ))
-        ) : filteredTodos.length === 0 ? (
+        ) : sortedTodos.length === 0 ? (
           <div className="text-center p-4 text-amber-700">
             {activeTab === "all" 
               ? "Nenhuma tarefa ativa encontrada. Adicione sua primeira tarefa!"
@@ -143,14 +146,15 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
         ) : (
           <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={items} strategy={verticalListSortingStrategy}>
-              {filteredTodos.map((todo) => (
+              {sortedTodos.map((todo) => (
                 <SortableTodo key={todo.id} todo={todo}>
                   {(listeners) => (
                     <div
                       className={cn(
                         "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
                         todo.completed ? "bg-yellow-100" : "",
-                        getPriorityClass(todo.priority)
+                        getPriorityClass(todo.priority),
+                        getOverdueClass(todo.hasReminder || false, todo.reminderTime)
                       )}
                       onClick={() => openEditTaskModal('todo', todo)}
                       style={{ cursor: 'pointer' }}
@@ -184,14 +188,31 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                         />
                         <div className="flex-grow">
                           <div className="flex justify-between">
-                            <span className={cn(
-                              "font-medium", 
-                              todo.completed 
-                                ? "line-through text-amber-400" 
-                                : "text-amber-800"
-                            )}>
-                              {todo.title}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className={cn(
+                                "font-medium", 
+                                todo.completed 
+                                  ? "line-through text-amber-400" 
+                                  : "text-amber-800"
+                              )}>
+                                {todo.title}
+                              </span>
+                              {todo.hasReminder && todo.reminderTime && (
+                                <div className={cn(
+                                  "flex items-center text-xs mt-1",
+                                  isReminderOverdue(todo.reminderTime) ? "text-red-600" : "text-gray-500"
+                                )}>
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {new Date(todo.reminderTime).toLocaleTimeString('pt-BR', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                  {isReminderOverdue(todo.reminderTime) && (
+                                    <span className="ml-1 text-red-600 font-medium">• Vencido</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             <div className="flex items-center">
                               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full mr-2">
                                 +{todo.priority === 'trivial' ? '1' : todo.priority === 'easy' ? '2' : todo.priority === 'medium' ? '5' : '10'}

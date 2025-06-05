@@ -69,3 +69,39 @@ export function isOverdue(date: Date | string): boolean {
   d.setHours(0, 0, 0, 0);
   return d < today;
 }
+
+// Check if a reminder is overdue
+export function isReminderOverdue(reminderTime: Date | string): boolean {
+  const reminder = typeof reminderTime === 'string' ? new Date(reminderTime) : reminderTime;
+  const now = new Date();
+  return reminder < now;
+}
+
+// Get overdue class for tasks with overdue reminders
+export function getOverdueClass(hasReminder: boolean, reminderTime?: Date | string | null): string {
+  if (!hasReminder || !reminderTime) return '';
+  return isReminderOverdue(reminderTime) ? 'bg-red-50 border-red-200' : '';
+}
+
+// Sort tasks by reminder time (overdue first, then by time)
+export function sortTasksByReminderTime<T extends { hasReminder?: boolean; reminderTime?: Date | string | null }>(tasks: T[]): T[] {
+  return [...tasks].sort((a, b) => {
+    // Tasks without reminders go to the end
+    if (!a.hasReminder || !a.reminderTime) return 1;
+    if (!b.hasReminder || !b.reminderTime) return -1;
+    
+    const aTime = typeof a.reminderTime === 'string' ? new Date(a.reminderTime) : a.reminderTime;
+    const bTime = typeof b.reminderTime === 'string' ? new Date(b.reminderTime) : b.reminderTime;
+    const now = new Date();
+    
+    const aOverdue = aTime < now;
+    const bOverdue = bTime < now;
+    
+    // Overdue tasks first
+    if (aOverdue && !bOverdue) return -1;
+    if (!aOverdue && bOverdue) return 1;
+    
+    // Then sort by time
+    return aTime.getTime() - bTime.getTime();
+  });
+}

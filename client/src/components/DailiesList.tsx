@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useTasks } from "@/contexts/TasksContext";
 import { Daily } from "@shared/schema";
-import { cn } from "@/lib/utils";
+import { cn, getOverdueClass, sortTasksByReminderTime, isReminderOverdue } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -81,6 +81,9 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
     if (activeTab === "completed") return daily.completed;
     return true;
   });
+
+  // Sort filtered dailies by reminder time (overdue first, then by time)
+  const sortedDailies = sortTasksByReminderTime(filteredDailies);
 
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
@@ -161,7 +164,7 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
               </div>
             </div>
           ))
-        ) : filteredDailies.length === 0 ? (
+        ) : sortedDailies.length === 0 ? (
           <div className="text-center p-4 text-gray-500">
             {activeTab === "all" 
               ? "Nenhuma tarefa diária encontrada. Adicione sua primeira tarefa diária!"
@@ -172,14 +175,15 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
         ) : (
           <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={items} strategy={verticalListSortingStrategy}>
-              {filteredDailies.map((daily) => (
+              {sortedDailies.map((daily) => (
                 <SortableDaily key={daily.id} daily={daily}>
                   {(listeners) => (
                     <div
                       className={cn(
                         "task-card bg-white border border-gray-200 rounded-md p-3 transition-all",
                         daily.completed ? "bg-gray-50" : "",
-                        getPriorityClass(daily.priority)
+                        getPriorityClass(daily.priority),
+                        getOverdueClass(daily.hasReminder || false, daily.reminderTime)
                       )}
                       onClick={() => openEditTaskModal('daily', daily)}
                       style={{ cursor: 'pointer' }}
@@ -214,9 +218,26 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                                   {React.createElement(getIconComponent(daily.icon), { size: 16 })}
                                 </div>
                               )}
-                              <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
-                                {daily.title}
-                              </span>
+                              <div className="flex flex-col">
+                                <span className={cn("font-medium", daily.completed && "line-through text-gray-500")}>
+                                  {daily.title}
+                                </span>
+                                {daily.hasReminder && daily.reminderTime && (
+                                  <div className={cn(
+                                    "flex items-center text-xs mt-1",
+                                    isReminderOverdue(daily.reminderTime) ? "text-red-600" : "text-gray-500"
+                                  )}>
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {new Date(daily.reminderTime).toLocaleTimeString('pt-BR', { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                    {isReminderOverdue(daily.reminderTime) && (
+                                      <span className="ml-1 text-red-600 font-medium">• Vencido</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center">
                               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full mr-2">

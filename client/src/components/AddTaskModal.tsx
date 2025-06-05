@@ -52,6 +52,12 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
     return nextHour.toTimeString().slice(0, 5); // Format as HH:MM
   };
   
+  // Function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+  
   // Habit-specific fields
   const [positive, setPositive] = useState(true);
   const [negative, setNegative] = useState(true);
@@ -79,7 +85,12 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           direction: positive && negative ? 'both' : positive ? 'positive' : 'negative',
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined
         };
         await createHabit(habit);
       } else if (type === 'daily') {
@@ -91,7 +102,12 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           icon: selectedIcon,
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined
         };
         
         console.log('Criando tarefa diária:', daily);
@@ -104,7 +120,12 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           dueDate: dueDate ? new Date(dueDate) : undefined,
           duration,
           hasReminder,
-          reminderTime: hasReminder && reminderTime ? new Date(`1970-01-01T${reminderTime}:00`) : undefined
+          reminderTime: hasReminder && reminderTime ? (() => {
+            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            const [hours, minutes] = reminderTime.split(':');
+            reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            return reminderDate;
+          })() : undefined
         };
         await createTodo(todo);
       }
@@ -222,6 +243,9 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
                   onChange={(e) => setReminderTime(e.target.value)}
                   className="w-full"
                 />
+                <div className="text-sm text-gray-500">
+                  Data: {getTodayDate()}
+                </div>
               </div>
             )}
           </div>
