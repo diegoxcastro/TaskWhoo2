@@ -53,6 +53,126 @@ app.use((req, res, next) => {
   next();
 });
 
+// Verificar se as tabelas necessárias existem
+async function verifyRequiredTables(client: any) {
+  const requiredTables = ['users', 'habits', 'dailies', 'todos', 'user_settings', 'notification_logs'];
+  
+  for (const table of requiredTables) {
+    try {
+      const result = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = $1
+        );
+      `, [table]);
+      
+      if (!result.rows[0].exists) {
+        throw new Error(`Tabela '${table}' não encontrada`);
+      }
+    } catch (error) {
+      console.log(`⚠️ Tabela '${table}' não encontrada ou inacessível`);
+      throw error;
+    }
+  }
+  
+  console.log("✅ Todas as tabelas necessárias estão presentes");
+}
+
+// Criar tabelas manualmente se as migrações falharam
+async function createTablesManually(client: any) {
+  const createTablesSQL = `
+    -- Criar tabela users se não existir
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      avatar TEXT,
+      auth_id TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    -- Criar tabela habits se não existir
+    CREATE TABLE IF NOT EXISTS habits (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(10) DEFAULT 'medium',
+      streak INTEGER DEFAULT 0,
+      notes TEXT,
+      reminder_time TIMESTAMP,
+      has_reminder BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    -- Criar tabela dailies se não existir
+    CREATE TABLE IF NOT EXISTS dailies (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(10) DEFAULT 'medium',
+      completed BOOLEAN DEFAULT false,
+      notes TEXT,
+      reminder_time TIMESTAMP,
+      has_reminder BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    -- Criar tabela todos se não existir
+    CREATE TABLE IF NOT EXISTS todos (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(10) DEFAULT 'medium',
+      completed BOOLEAN DEFAULT false,
+      notes TEXT,
+      reminder_time TIMESTAMP,
+      has_reminder BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    -- Criar tabela user_settings se não existir
+    CREATE TABLE IF NOT EXISTS user_settings (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+      webhook_url TEXT,
+      reminder_minutes_before INTEGER NOT NULL DEFAULT 15,
+      webhook_enabled BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP
+    );
+    
+    -- Criar tabela notification_logs se não existir
+    CREATE TABLE IF NOT EXISTS notification_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      task_id INTEGER NOT NULL,
+      task_type VARCHAR(10) NOT NULL,
+      reminder_time TIMESTAMP NOT NULL,
+      sent_at TIMESTAMP DEFAULT NOW(),
+      success BOOLEAN NOT NULL DEFAULT true,
+      error_message TEXT
+    );
+    
+    -- Criar tabela activity_logs se não existir
+    CREATE TABLE IF NOT EXISTS activity_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      action VARCHAR(50) NOT NULL,
+      entity_type VARCHAR(20) NOT NULL,
+      entity_id INTEGER NOT NULL,
+      details JSONB,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `;
+  
+  await client.query(createTablesSQL);
+  console.log("✅ Tabelas criadas/verificadas manualmente");
+}
+
 // Setup database tables if using PostgreSQL
 async function setupDatabase() {
   const useMemoryStorage = process.env.USE_MEMORY_STORAGE === 'true';
@@ -109,9 +229,22 @@ async function setupDatabase() {
       try {
         await migrate(db, { migrationsFolder: "./migrations" });
         console.log("✅ Migrações executadas com sucesso");
+        
+        // Verificar se as tabelas necessárias existem
+        await verifyRequiredTables(client);
+        
       } catch (migrationError) {
         console.error("❌ Erro ao executar migrações:", migrationError);
-        // Continue anyway as basic tables are created
+        console.log("🔧 Tentando criar tabelas manualmente...");
+        
+        // Tentar criar as tabelas manualmente se as migrações falharam
+        try {
+          await createTablesManually(client);
+          console.log("✅ Tabelas criadas manualmente com sucesso");
+        } catch (manualError) {
+          console.error("❌ Erro ao criar tabelas manualmente:", manualError);
+          console.log("⚠️ Continuando com inicialização, mas algumas funcionalidades podem não funcionar...");
+        }
       }
     } catch (error) {
       console.error("❌ Erro ao configurar tabelas do banco de dados:", error);

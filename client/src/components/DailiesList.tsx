@@ -208,7 +208,7 @@ export default function DailiesList({ dailies, isLoading, incompleteDailiesCount
                             }
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="mt-1 mr-3 h-5 w-5 rounded border-2 border-gray-300"
+                          className="mt-1 mr-3 h-6 w-6 rounded border-2 border-gray-300"
                         />
                         <div className="flex-grow">
                           <div className="flex justify-between">

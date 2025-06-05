@@ -180,7 +180,7 @@ export default function TodosList({ todos, isLoading, incompleteTodosCount }: To
                           }}
                           onClick={(e) => e.stopPropagation()}
                           className={cn(
-                            "mt-1 mr-3 h-5 w-5 rounded-full border-2",
+                            "mt-1 mr-3 h-6 w-6 rounded-full border-2",
                             todo.completed 
                               ? "border-amber-500 bg-amber-500 text-white" 
                               : "border-amber-300"

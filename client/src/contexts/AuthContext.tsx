@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,30 +17,49 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    // Try to restore user from localStorage on initial load
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Check if user was previously authenticated
     try {
       const savedUser = localStorage.getItem('habittracker_user');
-      return savedUser ? JSON.parse(savedUser) : null;
+      return !!savedUser;
     } catch {
-      return null;
+      return false;
     }
   });
   const { toast } = useToast();
   const [location, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  // Fetch user data using React Query when authenticated
+  const {
+    data: user,
+    isLoading,
+    error
+  } = useQuery<User>({
+    queryKey: ["/api/user"],
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401 errors
+      if (error?.status === 401) {
+        setIsAuthenticated(false);
+        localStorage.removeItem('habittracker_user');
+        return false;
+      }
+      return failureCount < 3;
+    }
+  });
 
   // Sync user state with localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem('habittracker_user', JSON.stringify(user));
-    } else {
+    } else if (!isLoading && isAuthenticated) {
+      // Only remove if we're not loading and should be authenticated
       localStorage.removeItem('habittracker_user');
+      setIsAuthenticated(false);
     }
-  }, [user]);
-
-  // Disable automatic auth check to prevent 401 errors and page reloads
-  // Authentication will be handled through login/register mutations only
-  const isLoading = false;
+  }, [user, isLoading, isAuthenticated]);
 
   // Login mutation
   const loginMutation = useMutation({
@@ -49,7 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (userData) => {
-      setUser(userData);
+      setIsAuthenticated(true);
+      // Set the user data in the query cache
+      queryClient.setQueryData(["/api/user"], userData);
+      localStorage.setItem('habittracker_user', JSON.stringify(userData));
       toast({
         title: "Login successful",
         description: `Welcome back, ${userData.username}!`,
@@ -57,7 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate("/");
     },
     onError: (error) => {
-      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('habittracker_user');
       toast({
         title: "Falha no login",
         description: "Usuário ou senha incorretos.",
@@ -73,7 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (userData) => {
-      setUser(userData);
+      setIsAuthenticated(true);
+      // Set the user data in the query cache
+      queryClient.setQueryData(["/api/user"], userData);
+      localStorage.setItem('habittracker_user', JSON.stringify(userData));
       toast({
         title: "Registration successful",
         description: `Welcome, ${userData.username}!`,
@@ -81,7 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate("/");
     },
     onError: (error) => {
-      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('habittracker_user');
       toast({
         title: "Falha no registro",
         description: "Não foi possível registrar. Tente outro nome de usuário.",
@@ -97,17 +124,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: () => {
-      setUser(null);
+      setIsAuthenticated(false);
+      // Clear user data from query cache
+      queryClient.setQueryData(["/api/user"], null);
+      localStorage.removeItem('habittracker_user');
       toast({
         title: "Logout realizado",
         description: "Você saiu da sua conta.",
       });
       navigate("/login");
     },
-    onError: (error) => {
+    onError: () => {
       toast({
-        title: "Logout failed",
-        description: error instanceof Error ? error.message : "Please try again",
+        title: "Erro no logout",
+        description: "Não foi possível fazer logout. Tente novamente.",
         variant: "destructive",
       });
     },
@@ -139,17 +169,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logoutMutation.mutateAsync();
   };
 
+  const value: AuthContextValue = {
+    user: user || null,
+    isLoading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending,
+    isAuthenticated: isAuthenticated && !!user,
+    login,
+    register,
+    logout,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

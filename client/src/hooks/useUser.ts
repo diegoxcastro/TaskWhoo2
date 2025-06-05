@@ -1,22 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { User } from "@shared/schema";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function useUser() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  // Fetch user data
-  const {
-    data: user,
-    isLoading,
-    error,
-    refetch
-  } = useQuery<User>({
-    queryKey: ["/api/user"],
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const { user, isLoading } = useAuth();
   
   // Update user profile mutation
   const updateProfileMutation = useMutation({
@@ -118,8 +109,6 @@ export function useUser() {
    return {
     user,
     isLoading,
-    error,
-    refetch,
     updateProfile: updateProfileMutation.mutate,
      isUpdating: updateProfileMutation.isPending,
      uploadAvatar: uploadAvatarMutation.mutate,

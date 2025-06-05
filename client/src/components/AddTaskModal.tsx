@@ -86,9 +86,23 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           duration,
           hasReminder,
           reminderTime: hasReminder && reminderTime ? (() => {
-            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            let reminderDate;
+            if (dueDate) {
+              // Para datas específicas, criar data local evitando problemas de timezone
+              const [year, month, day] = dueDate.split('-');
+              reminderDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            } else {
+              reminderDate = new Date();
+            }
+            
             const [hours, minutes] = reminderTime.split(':');
             reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            // Se não há dueDate e o horário já passou hoje, usar amanhã
+            if (!dueDate && reminderDate < new Date()) {
+              reminderDate.setDate(reminderDate.getDate() + 1);
+            }
+            
             return reminderDate;
           })() : undefined
         };
@@ -103,9 +117,23 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           duration,
           hasReminder,
           reminderTime: hasReminder && reminderTime ? (() => {
-            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            let reminderDate;
+            if (dueDate) {
+              // Para datas específicas, criar data local evitando problemas de timezone
+              const [year, month, day] = dueDate.split('-');
+              reminderDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            } else {
+              reminderDate = new Date();
+            }
+            
             const [hours, minutes] = reminderTime.split(':');
             reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            // Se não há dueDate e o horário já passou hoje, usar amanhã
+            if (!dueDate && reminderDate < new Date()) {
+              reminderDate.setDate(reminderDate.getDate() + 1);
+            }
+            
             return reminderDate;
           })() : undefined
         };
@@ -121,9 +149,23 @@ export default function AddTaskModal({ type, onClose }: AddTaskModalProps) {
           duration,
           hasReminder,
           reminderTime: hasReminder && reminderTime ? (() => {
-            const reminderDate = dueDate ? new Date(dueDate) : new Date();
+            let reminderDate;
+            if (dueDate) {
+              // Para datas específicas, criar data local evitando problemas de timezone
+              const [year, month, day] = dueDate.split('-');
+              reminderDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            } else {
+              reminderDate = new Date();
+            }
+            
             const [hours, minutes] = reminderTime.split(':');
             reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            // Se não há dueDate e o horário já passou hoje, usar amanhã
+            if (!dueDate && reminderDate < new Date()) {
+              reminderDate.setDate(reminderDate.getDate() + 1);
+            }
+            
             return reminderDate;
           })() : undefined
         };

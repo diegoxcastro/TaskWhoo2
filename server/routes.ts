@@ -1251,18 +1251,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[WEBHOOK] User ${user.username} (${user.id}) - webhook enabled, checking tasks...`);
           
           const now = new Date();
-          // Buscar lembretes que deveriam ter sido enviados (reminderTime - minutesBefore <= now <= reminderTime + 1 minuto)
-          const reminderWindowStart = new Date(now.getTime() - settings.reminderMinutesBefore * 60 * 1000 - 60 * 1000); // 1 minuto extra para margem
-          const reminderWindowEnd = new Date(now.getTime() + 60 * 1000); // 1 minuto no futuro para capturar lembretes próximos
+          // Buscar todas as tarefas com lembretes nas próximas 24 horas
+          const searchStart = new Date(now.getTime() - 60 * 1000); // 1 minuto atrás para margem
+          const searchEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 horas no futuro
           
           const tasksWithReminders = await storage.getTasksWithReminders(
             user.id, 
-            reminderWindowStart, 
-            reminderWindowEnd
+            searchStart, 
+            searchEnd
           );
           
           console.log(`[WEBHOOK] User ${user.username} (${user.id}) - found ${tasksWithReminders.length} tasks with reminders`);
-          console.log(`[WEBHOOK] Time window: ${reminderWindowStart.toISOString()} to ${reminderWindowEnd.toISOString()}`);
+          console.log(`[WEBHOOK] Search window: ${searchStart.toISOString()} to ${searchEnd.toISOString()}`);
           console.log(`[WEBHOOK] Current time: ${now.toISOString()}, Minutes before: ${settings.reminderMinutesBefore}`);
           
           for (const { task, type } of tasksWithReminders) {
@@ -1272,13 +1272,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               continue;
             }
             
-            // Verificar se é hora de enviar o lembrete (reminderTime - minutesBefore <= now)
+            // Calcular o horário real de notificação (reminderTime - minutesBefore)
             const notificationTime = new Date(reminderTime.getTime() - settings.reminderMinutesBefore * 60 * 1000);
             console.log(`[WEBHOOK] Task "${task.title}" - reminderTime: ${reminderTime.toISOString()}, notificationTime: ${notificationTime.toISOString()}`);
             
-            if (now < notificationTime) {
-              console.log(`[WEBHOOK] Task "${task.title}" - not yet time to send (${now.toISOString()} < ${notificationTime.toISOString()})`);
-              continue; // Ainda não é hora de enviar
+            // Verificar se o horário de notificação está dentro da janela atual (agora ± 1 minuto)
+            const notificationWindowStart = new Date(now.getTime() - 60 * 1000); // 1 minuto atrás
+            const notificationWindowEnd = new Date(now.getTime() + 60 * 1000); // 1 minuto no futuro
+            
+            if (notificationTime < notificationWindowStart || notificationTime > notificationWindowEnd) {
+              console.log(`[WEBHOOK] Task "${task.title}" - notification time outside current window (${notificationTime.toISOString()} not between ${notificationWindowStart.toISOString()} and ${notificationWindowEnd.toISOString()})`);
+              continue; // Não é hora de enviar ainda ou já passou
             }
             
             // Check if notification was already sent

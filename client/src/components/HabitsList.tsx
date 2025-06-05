@@ -90,13 +90,13 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
                 {habit.positive && (
                   <Button
                     size="sm"
-                    className="w-8 h-8 p-0 rounded-full bg-green-500 text-white hover:bg-green-600 mr-3 flex items-center justify-center"
+                    className="w-10 h-10 p-0 rounded-full bg-green-500 text-white hover:bg-green-600 mr-3 flex items-center justify-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       scoreHabit(habit.id, 'up');
                     }}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-5 w-5" />
                   </Button>
                 )}
                 <div className="flex-grow">
@@ -164,13 +164,13 @@ export default function HabitsList({ habits, isLoading }: HabitsListProps) {
               {habit.negative && (
                 <Button
                   size="sm"
-                  className="w-8 h-8 p-0 rounded-full bg-red-500 text-white hover:bg-red-600 flex items-center justify-center"
+                  className="w-10 h-10 p-0 rounded-full bg-red-500 text-white hover:bg-red-600 flex items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
                     scoreHabit(habit.id, 'down');
                   }}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-5 w-5" />
                 </Button>
               )}
             </div>

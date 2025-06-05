@@ -77,7 +77,7 @@ export default function UserProfile() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center">
           <div className="mr-4 relative">
-            <Avatar className="h-16 w-16 border-2 border-white">
+            <Avatar key={user.avatar || 'default'} className="h-16 w-16 border-2 border-white">
               <AvatarImage src={user.avatar || AVATAR_OPTIONS[0]} alt={user.username} />
               <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
